@@ -18,6 +18,7 @@
     OBJ library entry points */
 
 #include <obj/types.h>
+#include <obj/hashstrings.h>
 
 /*! Initialize OBJ library
     \return 0 if success, <0 if error */
@@ -66,6 +67,13 @@ obj_read(obj_t* obj, stream_t* stream);
 
 /*! Write OBJ data
 \param obj Source OBJ data structure
-\param stream Target stream */
+\param stream Target stream
+\return 0 if successful, <0 if error */
 OBJ_API int
 obj_write(const obj_t* obj, stream_t* stream);
+
+/*! Triangulate OBJ data
+\param obj Source OBJ data structure
+\return 0 if successful, <0 if error */
+OBJ_API int
+obj_triangulate(obj_t* obj);

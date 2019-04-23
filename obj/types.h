@@ -42,11 +42,89 @@
 
 typedef struct obj_config_t obj_config_t;
 typedef struct obj_t obj_t;
+typedef struct obj_material_t obj_material_t;
+typedef struct obj_color_t obj_color_t;
+typedef struct obj_vertex_t obj_vertex_t;
+typedef struct obj_normal_t obj_normal_t;
+typedef struct obj_uv_t obj_uv_t;
+typedef struct obj_corner_t obj_corner_t;
+typedef struct obj_face_t obj_face_t;
+typedef struct obj_group_t obj_group_t;
 
 struct obj_config_t {
 	size_t _unused;
 };
 
+struct obj_color_t {
+	real red;
+	real green;
+	real blue;
+};
+
+struct obj_material_t {
+	string_t name;
+
+	obj_color_t ambient_color;
+	string_t ambient_texture;
+
+	obj_color_t diffuse_color;
+	string_t diffuse_texture;
+
+	obj_color_t specular_color;
+	string_t specular_texture;
+
+	obj_color_t emissive_color;
+	string_t emissive_texture;
+
+	real dissolve_factor;
+	string_t dissolve_texture;
+
+	real shininess_exponent;
+	string_t shininess_texture;
+
+	string_t bump_texture;
+
+	obj_color_t transmission_filter;
+};
+
+struct obj_vertex_t {
+	real x;
+	real y;
+	real z;
+};
+
+struct obj_normal_t {
+	real nx;
+	real ny;
+	real nz;
+};
+
+struct obj_uv_t {
+	real u;
+	real v;
+};
+
+struct obj_corner_t {
+	int vertex;
+	int normal;
+	int uv;
+};
+
+struct obj_face_t {
+	int count;
+	int offset;
+};
+
+struct obj_group_t {
+	int material;
+	obj_corner_t* corner;
+	obj_face_t* face;
+};
+
 struct obj_t {
-	int _unused;
+	obj_material_t* material;
+	obj_vertex_t* vertex;
+	obj_normal_t* normal;
+	obj_uv_t* uv;
+	obj_group_t* group;
 };

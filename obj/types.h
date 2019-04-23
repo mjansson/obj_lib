@@ -1,4 +1,4 @@
-/* types.h  -  OBJ library  -  Public Domain  -  2018 Mattias Jansson / Rampant Pixels
+/* types.h  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson / Rampant Pixels
  *
  * This library provides a cross-platform OBJ I/O library in C11 providing
  * OBJ ascii reading and writing functionality.
@@ -41,8 +41,12 @@
 #endif
 
 typedef struct obj_config_t obj_config_t;
+typedef struct obj_t obj_t;
 
 struct obj_config_t {
 	size_t _unused;
 };
 
+struct obj_t {
+	int _unused;
+};

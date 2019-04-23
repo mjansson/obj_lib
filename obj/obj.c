@@ -1,4 +1,4 @@
-/* obj.c  -  OBJ library  -  Public Domain  -  2018 Mattias Jansson / Rampant Pixels
+/* obj.c  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson / Rampant Pixels
  *
  * This library provides a cross-platform OBJ I/O library in C11 providing
  * OBJ ascii reading and writing functionality.

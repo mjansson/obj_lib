@@ -1,4 +1,4 @@
-/* obj.h  -  OBJ library  -  Public Domain  -  2018 Mattias Jansson / Rampant Pixels
+/* obj.h  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson / Rampant Pixels
  *
  * This library provides a cross-platform OBJ I/O library in C11 providing
  * OBJ ascii reading and writing functionality.
@@ -47,3 +47,25 @@ OBJ_API void
 obj_module_parse_config(const char* path, size_t path_size, const char* buffer, size_t size,
                         const struct json_token_t* tokens, size_t num_tokens);
 
+/*! Initialize OBJ data structure
+\param obj Target OBJ data structure */
+OBJ_API void
+obj_initialize(obj_t* obj);
+
+/*! Finalize OBJ data structure
+\param obj OBJ data structure */
+OBJ_API void
+obj_finalize(obj_t* obj);
+
+/*! Read OBJ data
+\param obj Target OBJ data structure
+\param stream Source stream
+\return 0 if success, <0 if error */
+OBJ_API int
+obj_read(obj_t* obj, stream_t* stream);
+
+/*! Write OBJ data
+\param obj Source OBJ data structure
+\param stream Target stream */
+OBJ_API int
+obj_write(const obj_t* obj, stream_t* stream);

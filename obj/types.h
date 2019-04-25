@@ -40,6 +40,8 @@
 #endif
 #endif
 
+typedef stream_t* (*obj_stream_open)(const char*, size_t, unsigned int);
+
 typedef struct obj_config_t obj_config_t;
 typedef struct obj_t obj_t;
 typedef struct obj_material_t obj_material_t;
@@ -49,10 +51,11 @@ typedef struct obj_normal_t obj_normal_t;
 typedef struct obj_uv_t obj_uv_t;
 typedef struct obj_corner_t obj_corner_t;
 typedef struct obj_face_t obj_face_t;
+typedef struct obj_subgroup_t obj_subgroup_t;
 typedef struct obj_group_t obj_group_t;
 
 struct obj_config_t {
-	size_t _unused;
+	obj_stream_open stream_open;
 };
 
 struct obj_color_t {
@@ -115,10 +118,15 @@ struct obj_face_t {
 	int offset;
 };
 
-struct obj_group_t {
-	int material;
+struct obj_subgroup_t {
+	unsigned int material;
 	obj_corner_t* corner;
 	obj_face_t* face;
+};
+
+struct obj_group_t {
+	string_t name;
+	obj_subgroup_t** subgroups;
 };
 
 struct obj_t {
@@ -126,5 +134,5 @@ struct obj_t {
 	obj_vertex_t* vertex;
 	obj_normal_t* normal;
 	obj_uv_t* uv;
-	obj_group_t* group;
+	obj_group_t** group;
 };

@@ -123,9 +123,10 @@ obj_read(obj_t* obj, stream_t* stream) {
 	string_const_t tokens_storage[64];
 	const size_t tokens_capacity = sizeof(tokens_storage) / sizeof(tokens_storage[0]);
 
+	obj_material_t* current_material = nullptr;
+	obj_group_t* current_group = nullptr;
+	bool material_changed = false;
 	size_t num_vertex_since_group = 0;
-	size_t num_normal_since_group = 0;
-	size_t num_uv_since_group = 0;
 
 	while (!stream_eos(stream)) {
 		size_t last_remain = 0;
@@ -191,7 +192,6 @@ obj_read(obj_t* obj, stream_t* stream) {
 						obj_uv_t uv = {0, 0};
 						array_push(obj->uv, uv);
 					}
-					++num_uv_since_group;
 				} else if (string_equal(STRING_ARGS(command), STRING_CONST("vn"))) {
 					if (!array_capacity(obj->normal))
 						array_reserve(obj->normal, reserve_count);
@@ -204,10 +204,77 @@ obj_read(obj_t* obj, stream_t* stream) {
 						obj_normal_t normal = {0, 0, 0};
 						array_push(obj->normal, normal);
 					}
-					++num_normal_since_group;
 				}
 			} else if (command.str[0] == 'f') {
 				if (string_equal(STRING_ARGS(command), STRING_CONST("f")) && (num_tokens > 2)) {
+					size_t num_corners = num_tokens;
+
+					if (!current_group) {
+						current_group = memory_allocate(HASH_OBJ, sizeof(obj_group_t), 0,
+						                                MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
+						array_push(obj->group, current_group);
+
+						size_t estimated_triangles = (num_vertex_since_group * 3) / 2;
+						size_t estimated_corners = estimated_triangles * 3;
+
+						array_reserve(current_group->face, estimated_triangles);
+						array_reserve(current_group->corner, estimated_corners);
+
+						num_vertex_since_group = 0;
+
+						material_changed = true;
+					}
+
+					if (material_changed) {
+						if (!current_material)
+							current_material = setupMaterial(context, materialDefinition, defaultData);
+						material_changed = false;
+					}
+
+					unsigned int last_corner_count = array_size(current_group->corner);
+					obj_face_t face = {0, last_corner_count};
+					bool valid_face = (num_corners >= 3);
+					for (size_t icorner = 0; valid_face && (icorner < num_corners); ++icorner) {
+						string_const_t corner_token[3];
+						size_t num_corner_tokens = string_explode(STRING_ARGS(tokens[icorner]),
+						                                          STRING_CONST("/"), corner_token, 3, true);
+
+						unsigned int ivert = 0;
+						unsigned int iuv = 0;
+						unsigned int inorm = 0;
+						if (num_corner_tokens)
+							ivert = string_to_uint(STRING_ARGS(corner_token[0]), false);
+						if (num_corner_tokens > 1)
+							iuv = string_to_uint(STRING_ARGS(corner_token[1]), false);
+						if (num_corner_tokens > 2)
+							inorm = string_to_uint(STRING_ARGS(corner_token[2]), false);
+
+						if (ivert < 0)
+							ivert = array_size(obj->vertex) + ivert + 1;
+						if (inorm < 0)
+							inorm = array_size(obj->normal) + inorm + 1;
+						if (iuv < 0)
+							iuv = array_size(obj->uv) + iuv + 1;
+
+						if ((ivert <= 0) || (ivert > (ssize_t)array_size(obj->vertex)))
+							valid_face = false;
+						if ((inorm <= 0) || (inorm > (ssize_t)array_size(obj->normal)))
+							inorm = 0;
+						if ((iuv <= 0) || (iuv > (ssize_t)array_size(obj->uv)))
+							iuv = 0;
+
+						if (valid_face) {
+							obj_corner_t corner = {ivert, inorm, iuv};
+							array_push(current_group->corner, corner);
+							++face.count;
+						}
+					}
+
+					if (valid_face) {
+						array_push(current_group->face, face);
+					} else {
+						array_resize(current_group->corner, last_corner_count);
+					}
 				}
 			} else if (command.str[0] == 'm') {
 				if (string_equal(STRING_ARGS(command), STRING_CONST("mtllib"))) {

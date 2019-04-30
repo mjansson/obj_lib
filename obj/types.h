@@ -56,6 +56,8 @@ typedef struct obj_group_t obj_group_t;
 
 struct obj_config_t {
 	obj_stream_open stream_open;
+	string_const_t* search_path;
+	size_t search_path_count;
 };
 
 struct obj_color_t {
@@ -108,31 +110,47 @@ struct obj_uv_t {
 };
 
 struct obj_corner_t {
+	//! Vertex index plus one, always greater than 0
 	int vertex;
+	//! Normal index plus one, thus less or equal to 0 for no/invalid normal
 	int normal;
+	//! UV index plus one, thus less or equal to 0 for no/invalid UV
 	int uv;
 };
 
 struct obj_face_t {
+	//! Number of indices in face
 	int count;
+	//! Offset in subgroup index array where face indices start
 	int offset;
 };
 
 struct obj_subgroup_t {
+	//! Material index
 	unsigned int material;
+	//! Corner data (unique corner tuples, can be shared between faces)
 	obj_corner_t* corner;
+	//! Corner indices for all faces
+	int* index;
+	//! Subgroup faces
 	obj_face_t* face;
+	//! Triangulation by obj_triangulate
+	int* triangle;
+	//! Number of triangles in triangulation
+	unsigned int triangle_count;
 };
 
 struct obj_group_t {
 	string_t name;
-	obj_subgroup_t** subgroups;
+	obj_subgroup_t** subgroup;
 };
 
 struct obj_t {
+	string_t base_path;
 	obj_material_t* material;
 	obj_vertex_t* vertex;
 	obj_normal_t* normal;
 	obj_uv_t* uv;
+	obj_corner_t* corner;
 	obj_group_t** group;
 };

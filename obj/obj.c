@@ -16,6 +16,7 @@
 
 #include <foundation/array.h>
 #include <foundation/stream.h>
+#include <foundation/path.h>
 
 static unsigned int INVALID_INDEX = 0xFFFFFFFF;
 
@@ -56,8 +57,8 @@ static void
 obj_finalize_groups(obj_t* obj) {
 	for (unsigned int igroup = 0, gsize = array_size(obj->group); igroup < gsize; ++igroup) {
 		obj_group_t* group = obj->group[igroup];
-		for (unsigned int isub = 0, sgsize = array_size(group->subgroups); isub < sgsize; ++isub) {
-			obj_subgroup_t* subgroup = group->subgroups[isub];
+		for (unsigned int isub = 0, sgsize = array_size(group->subgroup); isub < sgsize; ++isub) {
+			obj_subgroup_t* subgroup = group->subgroup[isub];
 			array_deallocate(subgroup->corner);
 			array_deallocate(subgroup->face);
 			memory_deallocate(subgroup);
@@ -101,6 +102,8 @@ obj_finalize(obj_t* obj) {
 	array_deallocate(obj->vertex);
 	array_deallocate(obj->normal);
 	array_deallocate(obj->uv);
+
+	string_deallocate(obj->base_path.str);
 }
 
 static inline bool
@@ -191,10 +194,22 @@ material_default(void) {
 int
 load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	stream_t* stream = nullptr;
-	if (_obj_config.stream_open)
+	if (_obj_config.stream_open) {
 		stream = _obj_config.stream_open(filename, length, STREAM_IN);
-	else
+	} else {
 		stream = stream_open(filename, length, STREAM_IN);
+		if (!stream) {
+			string_t testpath = path_allocate_concat(STRING_ARGS(obj->base_path), filename, length);
+			stream = stream_open(STRING_ARGS(testpath), STREAM_IN);
+			string_deallocate(testpath.str);
+		}
+		for (size_t ipath = 0; !stream && ipath < _obj_config.search_path_count; ++ipath) {
+			string_t testpath =
+			    path_allocate_concat(STRING_ARGS(_obj_config.search_path[ipath]), filename, length);
+			stream = stream_open(STRING_ARGS(testpath), STREAM_IN);
+			string_deallocate(testpath.str);
+		}
+	}
 	if (!stream)
 		return 1;
 
@@ -306,7 +321,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	if (material_valid)
 		array_push(obj->material, material);
 	else
-		obj_material_finalize(&material);
+		obj_finalize_material(&material);
 
 	stream_deallocate(stream);
 
@@ -328,6 +343,11 @@ obj_read(obj_t* obj, stream_t* stream) {
 	array_clear(obj->uv);
 
 	array_reserve(obj->vertex, reserve_count);
+
+	string_deallocate(obj->base_path.str);
+	string_const_t path = stream_path(stream);
+	path = path_directory_name(STRING_ARGS(path));
+	obj->base_path = string_clone(STRING_ARGS(path));
 
 	const size_t buffer_capacity = 4000;
 	char* buffer = memory_allocate(HASH_OBJ, buffer_capacity, 0, MEMORY_PERSISTENT);
@@ -441,7 +461,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 
 					current_subgroup = memory_allocate(HASH_OBJ, sizeof(obj_subgroup_t), 0,
 					                                   MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
-					array_push(current_group->subgroups, current_subgroup);
+					array_push(current_group->subgroup, current_subgroup);
 
 					current_subgroup->material = material_index;
 
@@ -536,7 +556,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 
 	memory_deallocate(buffer);
 
-	return -1;
+	return 0;
 }
 
 int
@@ -549,5 +569,5 @@ obj_write(const obj_t* obj, stream_t* stream) {
 int
 obj_triangulate(obj_t* obj) {
 	FOUNDATION_UNUSED(obj);
-	return -1;
+	return 0;
 }

@@ -362,6 +362,9 @@ obj_read(obj_t* obj, stream_t* stream) {
 	string_t group_name = {0};
 	unsigned int material_index = INVALID_INDEX;
 
+	int* vertex_to_corner = nullptr;
+	array_reserve(vertex_to_corner, array_capacity(obj->vertex));
+
 	while (!stream_eos(stream)) {
 		size_t last_remain = 0;
 		size_t was_read = stream_read(stream, buffer, buffer_capacity);
@@ -450,6 +453,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 					group_name = string(0, 0);
 
 					current_subgroup = nullptr;
+					array_clear(vertex_to_corner);
 				}
 
 				if (!current_subgroup) {
@@ -463,19 +467,19 @@ obj_read(obj_t* obj, stream_t* stream) {
 					                                   MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
 					array_push(current_group->subgroup, current_subgroup);
 
-					current_subgroup->material = material_index;
-
 					size_t estimated_triangles = (num_vertex_since_group * 3) / 2;
 					size_t estimated_corners = estimated_triangles * 3;
 
 					array_reserve(current_subgroup->face, estimated_triangles);
 					array_reserve(current_subgroup->corner, estimated_corners);
+					array_reserve(current_subgroup->index, estimated_corners);
+					current_subgroup->material = material_index;
 
 					num_vertex_since_group = 0;
 				}
 
-				unsigned int last_corner_count = array_size(current_subgroup->corner);
-				obj_face_t face = {0, last_corner_count};
+				unsigned int last_index_count = array_size(current_subgroup->index);
+				obj_face_t face = {0, last_index_count};
 				bool valid_face = (num_corners >= 3);
 				for (size_t icorner = 0; valid_face && (icorner < num_corners); ++icorner) {
 					string_const_t corner_token[3];
@@ -507,8 +511,18 @@ obj_read(obj_t* obj, stream_t* stream) {
 						iuv = 0;
 
 					if (valid_face) {
-						obj_corner_t corner = {ivert, inorm, iuv};
-						array_push(current_subgroup->corner, corner);
+						if ((ivert > array_size(vertex_to_corner)) ||
+						    !vertex_to_corner[ivert - 1]) {
+							obj_corner_t corner = {ivert, inorm, iuv};
+							unsigned int corner_index = array_size(vertex_to_corner);
+							array_push(current_subgroup->corner, corner);
+							if (ivert > array_size(vertex_to_corner)) {
+							}
+							vertex_to_corner[ivert - 1] = corner_index;
+							array_push()
+						} else {
+						}
+
 						++face.count;
 					}
 				}
@@ -516,7 +530,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 				if (valid_face) {
 					array_push(current_subgroup->face, face);
 				} else {
-					array_resize(current_subgroup->corner, last_corner_count);
+					array_resize(current_subgroup->index, last_index_count);
 				}
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("mtllib")) && num_tokens) {
 				load_material_lib(obj, STRING_ARGS(tokens[0]));
@@ -553,7 +567,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 	}
 
 	string_deallocate(group_name.str);
-
+	array_deallocate(vertex_to_corner);
 	memory_deallocate(buffer);
 
 	return 0;

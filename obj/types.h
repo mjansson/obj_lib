@@ -111,11 +111,13 @@ struct obj_uv_t {
 
 struct obj_corner_t {
 	//! Vertex index plus one, always greater than 0
-	int vertex;
-	//! Normal index plus one, thus less or equal to 0 for no/invalid normal
-	int normal;
-	//! UV index plus one, thus less or equal to 0 for no/invalid UV
-	int uv;
+	unsigned int vertex;
+	//! Normal index plus one, thus equal to 0 for no/invalid normal
+	unsigned int normal;
+	//! UV index plus one, thus less to 0 for no/invalid UV
+	unsigned int uv;
+	//! Index of next corner sharing the same vertex index, less than 0 if none
+	int next;
 };
 
 struct obj_face_t {
@@ -131,11 +133,11 @@ struct obj_subgroup_t {
 	//! Corner data (unique corner tuples, can be shared between faces)
 	obj_corner_t* corner;
 	//! Corner indices for all faces
-	int* index;
+	unsigned int* index;
 	//! Subgroup faces
 	obj_face_t* face;
-	//! Triangulation by obj_triangulate
-	int* triangle;
+	//! Triangulation by obj_triangulate (zero-based index into corner array)
+	unsigned int* triangle;
 	//! Number of triangles in triangulation
 	unsigned int triangle_count;
 };

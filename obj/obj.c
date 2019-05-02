@@ -59,10 +59,14 @@ obj_finalize_groups(obj_t* obj) {
 		obj_group_t* group = obj->group[igroup];
 		for (unsigned int isub = 0, sgsize = array_size(group->subgroup); isub < sgsize; ++isub) {
 			obj_subgroup_t* subgroup = group->subgroup[isub];
+			array_deallocate(subgroup->triangle);
+			array_deallocate(subgroup->index);
 			array_deallocate(subgroup->corner);
 			array_deallocate(subgroup->face);
 			memory_deallocate(subgroup);
 		}
+		array_deallocate(group->subgroup);
+		string_deallocate(group->name.str);
 		memory_deallocate(group);
 	}
 
@@ -180,7 +184,6 @@ parse_color(const string_const_t* tokens, size_t num_tokens) {
 obj_material_t
 material_default(void) {
 	obj_material_t material = {0};
-	material.name = string_clone(STRING_CONST("default"));
 	set_color(&material.ambient_color, 0, 0, 0);
 	set_color(&material.diffuse_color, 1, 1, 1);
 	set_color(&material.specular_color, 0, 0, 0);
@@ -323,6 +326,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	else
 		obj_finalize_material(&material);
 
+	memory_deallocate(buffer);
 	stream_deallocate(stream);
 
 	return 0;
@@ -511,18 +515,45 @@ obj_read(obj_t* obj, stream_t* stream) {
 						iuv = 0;
 
 					if (valid_face) {
+						unsigned int corner_index;
+						unsigned int corner_count = array_size(current_subgroup->corner);
 						if ((ivert > array_size(vertex_to_corner)) ||
-						    !vertex_to_corner[ivert - 1]) {
-							obj_corner_t corner = {ivert, inorm, iuv};
-							unsigned int corner_index = array_size(vertex_to_corner);
+						    (vertex_to_corner[ivert - 1] < 0)) {
+							obj_corner_t corner = {ivert, inorm, iuv, -1};
+							corner_index = array_size(current_subgroup->corner);
 							array_push(current_subgroup->corner, corner);
 							if (ivert > array_size(vertex_to_corner)) {
+								unsigned int prev_size = array_size(vertex_to_corner);
+								array_resize(vertex_to_corner, ivert);
+								memset(vertex_to_corner + prev_size, 0xFF,
+								       sizeof(int) * (ivert - prev_size));
 							}
 							vertex_to_corner[ivert - 1] = corner_index;
-							array_push()
 						} else {
+							corner_index = vertex_to_corner[ivert - 1];
+							obj_corner_t* last_corner = nullptr;
+							while (corner_index < corner_count) {
+								obj_corner_t* corner = current_subgroup->corner + corner_index;
+								if (!corner->normal || !inorm || (corner->normal == inorm)) {
+									if (!corner->uv || !iuv || (corner->uv == iuv)) {
+										if (inorm && !corner->normal)
+											corner->normal = inorm;
+										if (iuv && !corner->uv)
+											corner->uv = iuv;
+										break;
+									}
+								}
+								corner_index = (unsigned int)corner->next;
+								last_corner = corner;
+							}
+							if (corner_index >= corner_count) {
+								obj_corner_t corner = {ivert, inorm, iuv, -1};
+								corner_index = array_size(current_subgroup->corner);
+								array_push(current_subgroup->corner, corner);
+								last_corner->next = corner_index;
+							}
 						}
-
+						array_push(current_subgroup->index, corner_index);
 						++face.count;
 					}
 				}
@@ -580,8 +611,154 @@ obj_write(const obj_t* obj, stream_t* stream) {
 	return -1;
 }
 
+static void
+calc_edge(obj_vertex_t* from, obj_vertex_t* to, real* edge) {
+	edge[0] = to->x - from->x;
+	edge[1] = to->y - from->y;
+	edge[2] = to->z - from->z;
+}
+
+static void
+calc_normal(const real* FOUNDATION_RESTRICT first_edge, const real* FOUNDATION_RESTRICT second_edge,
+            real* FOUNDATION_RESTRICT normal) {
+	normal[0] = first_edge[1] * second_edge[2] - first_edge[2] * second_edge[1];
+	normal[1] = first_edge[2] * second_edge[0] - first_edge[0] * second_edge[2];
+	normal[2] = first_edge[0] * second_edge[1] - first_edge[1] * second_edge[0];
+}
+
+static real
+normal_dot(const real* FOUNDATION_RESTRICT first_normal,
+           const real* FOUNDATION_RESTRICT second_normal) {
+	return (first_normal[0] * second_normal[0]) + (first_normal[1] * second_normal[1]) +
+	       (first_normal[2] * second_normal[2]);
+}
+
+static bool
+polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
+               unsigned int corner_count) {
+	if (corner_count < 4)
+		return true;
+
+	int prev_corner;
+	int cur_corner = index[0];
+	int next_corner = index[1];
+
+	obj_vertex_t* next_vertex = vertex + (corner[next_corner].vertex - 1);
+	obj_vertex_t* cur_vertex = vertex + (corner[cur_corner].vertex - 1);
+
+	real edge[3];
+	calc_edge(cur_vertex, next_vertex, edge);
+
+	real last_normal[3] = {0, 0, 0};
+	real last_edge[3];
+
+	bool first_normal = true;
+	for (unsigned int icorner = 0; icorner < corner_count; ++icorner) {
+		prev_corner = cur_corner;
+		cur_corner = next_corner;
+		next_corner = index[(icorner + 2) % corner_count];
+
+		if ((prev_corner == cur_corner) || (prev_corner == next_corner) ||
+		    (cur_corner == next_corner))
+			continue;
+
+		last_edge[0] = edge[0];
+		last_edge[1] = edge[1];
+		last_edge[2] = edge[2];
+
+		cur_vertex = next_vertex;
+		next_vertex = vertex + (corner[next_corner].vertex - 1);
+		calc_edge(cur_vertex, next_vertex, edge);
+
+		real normal[3];
+		calc_normal(last_edge, edge, normal);
+		if (!first_normal && (normal_dot(last_normal, normal) < 0))
+			return false;
+		if (first_normal && (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) ||
+		                     !math_real_is_zero(normal[2]))) {
+			last_normal[0] = normal[0];
+			last_normal[1] = normal[1];
+			last_normal[2] = normal[2];
+			first_normal = false;
+		}
+	}
+
+	return true;
+}
+
+static unsigned int
+triangulate_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
+                   unsigned int corner_count, unsigned int** triangle) {
+	FOUNDATION_UNUSED(vertex);
+	FOUNDATION_UNUSED(corner);
+	unsigned int triangle_count = 0;
+	unsigned int base = 1;
+	while (corner_count >= 3) {
+		array_push(*triangle, index[0]);
+		array_push(*triangle, index[base]);
+		array_push(*triangle, index[base + 1]);
+		++base;
+		++triangle_count;
+		--corner_count;
+	}
+	return triangle_count;
+}
+
+static unsigned int
+triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
+                    unsigned int corner_count, unsigned int** triangle) {
+	FOUNDATION_UNUSED(vertex);
+	FOUNDATION_UNUSED(corner);
+	unsigned int triangle_count = 0;
+	unsigned int base = corner_count - 1;
+	while (corner_count >= 3) {
+		array_push(*triangle, index[base - 1]);
+		array_push(*triangle, index[base]);
+		array_push(*triangle, index[0]);
+		--base;
+		++triangle_count;
+	}
+	return triangle_count;
+}
+
+static int
+obj_triangulate_subgroup(obj_t* obj, obj_subgroup_t* subgroup) {
+	array_clear(subgroup->triangle);
+	array_reserve(subgroup->triangle, 3 * array_size(subgroup->face));
+	subgroup->triangle_count = 0;
+
+	for (unsigned int iface = 0, fsize = array_size(subgroup->face); iface < fsize; ++iface) {
+		obj_face_t* face = subgroup->face + iface;
+		bool convex = polygon_convex(subgroup->index + face->offset, subgroup->corner, obj->vertex,
+		                             face->count);
+
+		if (convex)
+			subgroup->triangle_count +=
+			    triangulate_convex(subgroup->index + face->offset, subgroup->corner, obj->vertex,
+			                       face->count, &subgroup->triangle);
+		else
+			subgroup->triangle_count +=
+			    triangulate_concave(subgroup->index + face->offset, subgroup->corner, obj->vertex,
+			                        face->count, &subgroup->triangle);
+	}
+	return 0;
+}
+
 int
 obj_triangulate(obj_t* obj) {
-	FOUNDATION_UNUSED(obj);
+	if (!obj)
+		return -1;
+	for (unsigned int igroup = 0, gsize = array_size(obj->group); igroup < gsize; ++igroup) {
+		obj_group_t* group = obj->group[igroup];
+		for (unsigned int isubgroup = 0, sgsize = array_size(group->subgroup); isubgroup < sgsize;
+		     ++isubgroup) {
+			obj_subgroup_t* subgroup = group->subgroup[isubgroup];
+			if (subgroup->triangle_count)
+				continue;
+			int err = obj_triangulate_subgroup(obj, subgroup);
+			if (err)
+				return err;
+		}
+	}
 	return 0;
 }

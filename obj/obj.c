@@ -580,6 +580,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 					current_subgroup = nullptr;
 				}
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("g"))) {
+				string_deallocate(group_name.str);
 				group_name = (num_tokens && tokens[0].length) ?
 				                 string_clone_string(tokens[0]) :
 				                 string_clone(STRING_CONST("__unnamed"));
@@ -717,6 +718,7 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 		array_push(*triangle, index[0]);
 		--base;
 		++triangle_count;
+		--corner_count;
 	}
 	return triangle_count;
 }

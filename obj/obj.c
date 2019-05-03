@@ -457,7 +457,6 @@ obj_read(obj_t* obj, stream_t* stream) {
 					group_name = string(0, 0);
 
 					current_subgroup = nullptr;
-					array_clear(vertex_to_corner);
 				}
 
 				if (!current_subgroup) {
@@ -478,6 +477,8 @@ obj_read(obj_t* obj, stream_t* stream) {
 					array_reserve(current_subgroup->corner, estimated_corners);
 					array_reserve(current_subgroup->index, estimated_corners);
 					current_subgroup->material = material_index;
+
+					array_clear(vertex_to_corner);
 
 					num_vertex_since_group = 0;
 				}

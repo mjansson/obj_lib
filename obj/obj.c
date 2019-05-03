@@ -613,25 +613,34 @@ obj_write(const obj_t* obj, stream_t* stream) {
 }
 
 static void
-calc_edge(obj_vertex_t* from, obj_vertex_t* to, real* edge) {
-	edge[0] = to->x - from->x;
-	edge[1] = to->y - from->y;
-	edge[2] = to->z - from->z;
+vertex_sub(obj_vertex_t* from, obj_vertex_t* to, real* diff) {
+	diff[0] = to->x - from->x;
+	diff[1] = to->y - from->y;
+	diff[2] = to->z - from->z;
 }
 
 static void
-calc_normal(const real* FOUNDATION_RESTRICT first_edge, const real* FOUNDATION_RESTRICT second_edge,
-            real* FOUNDATION_RESTRICT normal) {
+vec_cross(const real* FOUNDATION_RESTRICT first_edge, const real* FOUNDATION_RESTRICT second_edge,
+          real* FOUNDATION_RESTRICT normal) {
 	normal[0] = first_edge[1] * second_edge[2] - first_edge[2] * second_edge[1];
 	normal[1] = first_edge[2] * second_edge[0] - first_edge[0] * second_edge[2];
 	normal[2] = first_edge[0] * second_edge[1] - first_edge[1] * second_edge[0];
 }
 
 static real
-normal_dot(const real* FOUNDATION_RESTRICT first_normal,
-           const real* FOUNDATION_RESTRICT second_normal) {
+vec_dot(const real* FOUNDATION_RESTRICT first_normal,
+        const real* FOUNDATION_RESTRICT second_normal) {
 	return (first_normal[0] * second_normal[0]) + (first_normal[1] * second_normal[1]) +
 	       (first_normal[2] * second_normal[2]);
+}
+
+static void
+vec_normalize(real* vec) {
+	real length_sqr = vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2];
+	real oolength = math_rsqrt(length_sqr);
+	vec[0] *= oolength;
+	vec[1] *= oolength;
+	vec[2] *= oolength;
 }
 
 static bool
@@ -648,7 +657,7 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 	obj_vertex_t* cur_vertex = vertex + (corner[cur_corner].vertex - 1);
 
 	real edge[3];
-	calc_edge(cur_vertex, next_vertex, edge);
+	vertex_sub(cur_vertex, next_vertex, edge);
 
 	real last_normal[3] = {0, 0, 0};
 	real last_edge[3];
@@ -669,11 +678,11 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 
 		cur_vertex = next_vertex;
 		next_vertex = vertex + (corner[next_corner].vertex - 1);
-		calc_edge(cur_vertex, next_vertex, edge);
+		vertex_sub(cur_vertex, next_vertex, edge);
 
 		real normal[3];
-		calc_normal(last_edge, edge, normal);
-		if (!first_normal && (normal_dot(last_normal, normal) < 0))
+		vec_cross(last_edge, edge, normal);
+		if (!first_normal && (vec_dot(last_normal, normal) < 0))
 			return false;
 		if (first_normal && (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) ||
 		                     !math_real_is_zero(normal[2]))) {
@@ -685,6 +694,27 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 	}
 
 	return true;
+}
+
+static bool
+point_inside_triangle_2d(const real* FOUNDATION_RESTRICT v0, const real* FOUNDATION_RESTRICT v1,
+                         const real* FOUNDATION_RESTRICT v2, const real* FOUNDATION_RESTRICT pt) {
+	double ax = v2[0] - v1[0];
+	double ay = v2[1] - v1[1];
+	double bx = v0[0] - v2[0];
+	double by = v0[1] - v2[1];
+	double cx = v1[0] - v0[0];
+	double cy = v1[1] - v0[1];
+	double apx = pt[0] - v0[0];
+	double apy = pt[1] - v0[1];
+	double bpx = pt[0] - v1[0];
+	double bpy = pt[1] - v1[1];
+	double cpx = pt[0] - v2[0];
+	double cpy = pt[1] - v2[1];
+	double s0 = ax * bpy - ay * bpx;
+	double s1 = cx * apy - cy * apx;
+	double s2 = bx * cpy - by * cpx;
+	return ((s0 >= 0) && (s1 >= 0) && (s2 >= 0)) || ((s0 <= 0) && (s1 <= 0) && (s2 <= 0));
 }
 
 static unsigned int
@@ -707,19 +737,141 @@ triangulate_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vert
 
 static unsigned int
 triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
-                    unsigned int corner_count, unsigned int** triangle) {
-	FOUNDATION_UNUSED(vertex);
-	FOUNDATION_UNUSED(corner);
-	unsigned int triangle_count = 0;
-	unsigned int base = corner_count - 1;
-	while (corner_count >= 3) {
-		array_push(*triangle, index[base - 1]);
-		array_push(*triangle, index[base]);
-		array_push(*triangle, index[0]);
-		--base;
-		++triangle_count;
-		--corner_count;
+                    unsigned int index_count, unsigned int** triangle) {
+	if (index_count < 3)
+		return 0;
+
+	real xaxis[3];
+	real yaxis[3];
+	real normal[3];
+	unsigned int cur_index = 0;
+	unsigned int cur_corner = index[cur_index];
+	do {
+		unsigned int next_index = cur_index + 1;
+		unsigned int next_corner = index[next_index];
+		unsigned int last_corner = index[(cur_index + 2) % index_count];
+		vertex_sub(vertex + (corner[next_corner].vertex - 1),
+		           vertex + (corner[last_corner].vertex - 1), xaxis);
+		vertex_sub(vertex + (corner[next_corner].vertex - 1),
+		           vertex + (corner[cur_corner].vertex - 1), yaxis);
+		vec_cross(xaxis, yaxis, normal);
+		if (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) ||
+		    !math_real_is_zero(normal[2])) {
+			vec_normalize(normal);
+			break;
+		}
+		cur_index = next_index;
+		cur_corner = next_corner;
+	} while (cur_index < (index_count - 1));
+
+	if (cur_index == (index_count - 1))
+		return 0;  // All corners in a straight line
+
+	vec_normalize(xaxis);
+	vec_cross(normal, xaxis, yaxis);
+	vec_normalize(yaxis);
+
+#define BASE_COORDINATES 32
+	real base_xy[BASE_COORDINATES * 2];
+	real* coord = base_xy;
+
+	unsigned int base_local[BASE_COORDINATES];
+	unsigned int* local = base_local;
+
+	if (index_count > BASE_COORDINATES) {
+		coord = memory_allocate(HASH_OBJ, sizeof(real) * index_count * 2, 0, MEMORY_TEMPORARY);
+		local = memory_allocate(HASH_OBJ, sizeof(unsigned int) * index_count, 0, MEMORY_TEMPORARY);
 	}
+
+	obj_vertex_t* origo = vertex + (corner[index[0]].vertex - 1);
+
+	// Project polygon on plane
+	coord[0] = 0;
+	coord[1] = 0;
+	local[0] = 0;
+	for (unsigned int icorner = 1; icorner < index_count; ++icorner) {
+		real diff[3];
+		vertex_sub(origo, vertex + (corner[index[icorner]].vertex - 1), diff);
+		coord[(icorner * 2) + 0] = vec_dot(diff, xaxis);
+		coord[(icorner * 2) + 1] = vec_dot(diff, yaxis);
+		local[icorner] = icorner;
+	}
+
+	real winding = 0;
+	for (unsigned int icorner = 0; icorner < index_count; ++icorner) {
+		unsigned int inext = (icorner + 1) % index_count;
+		real xdiff = coord[inext * 2] - coord[icorner * 2];
+		real ysum = coord[(inext * 2) + 1] + coord[(inext * 2) + 1];
+		winding += xdiff * ysum;
+	}
+
+	// Ear clip polygon in 2D
+	unsigned int local_count = index_count;
+	unsigned int triangle_count = 0;
+	while (local_count > 3) {
+		unsigned int base = 1;
+		do {
+			unsigned int prev = base ? (base - 1) : (local_count - 1);
+			unsigned int next = (base + 1) % local_count;
+			unsigned int i0 = local[prev];
+			unsigned int i1 = local[base];
+			unsigned int i2 = local[next];
+
+			if ((i0 == i1) || (i0 == i2) || (i1 == i2)) {
+				memmove(local + base, local + base + 1,
+				        sizeof(unsigned int) * (local_count - base - 1));
+				base = 1;
+				--local_count;
+				continue;
+			}
+
+			real xdiff = coord[i1 * 2] - coord[i0 * 2];
+			real ysum = coord[(i1 * 2) + 1] + coord[(i0 * 2) + 1];
+			real triangle_winding = xdiff * ysum;
+
+			xdiff = coord[i2 * 2] - coord[i1 * 2];
+			ysum = coord[(i2 * 2) + 1] + coord[(i1 * 2) + 1];
+			triangle_winding += xdiff * ysum;
+
+			xdiff = coord[i0 * 2] - coord[i2 * 2];
+			ysum = coord[(i0 * 2) + 1] + coord[(i2 * 2) + 1];
+			triangle_winding += xdiff * ysum;
+
+			if (((winding < 0) && (triangle_winding >= 0)) ||
+			    ((winding > 0) && (triangle_winding <= 0))) {
+				++base;
+				continue;
+			}
+
+			bool point_inside = false;
+			for (unsigned int ipt = 0; !point_inside && (ipt < local_count); ++ipt) {
+				if ((ipt != prev) && (ipt != base) && (ipt != next))
+					point_inside =
+					    point_inside_triangle_2d(coord + (i0 * 2), coord + (i1 * 2),
+					                             coord + (i2 * 2), coord + (local[ipt] * 2));
+			}
+
+			if (point_inside) {
+				++base;
+				continue;
+			}
+
+			array_push(*triangle, index[i0]);
+			array_push(*triangle, index[i1]);
+			array_push(*triangle, index[i2]);
+			++triangle_count;
+
+			memmove(local + base, local + base + 1,
+			        sizeof(unsigned int) * (local_count - base - 1));
+			base = 1;
+			--local_count;
+
+		} while ((base != local_count) && (local_count >= 3));
+
+		if (base == local_count)
+			break;  // Only degenerate zero area triangles left
+	}
+
 	return triangle_count;
 }
 

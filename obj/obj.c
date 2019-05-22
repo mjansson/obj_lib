@@ -700,18 +700,18 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 static bool
 point_inside_triangle_2d(const real* FOUNDATION_RESTRICT v0, const real* FOUNDATION_RESTRICT v1,
                          const real* FOUNDATION_RESTRICT v2, const real* FOUNDATION_RESTRICT pt) {
-	double ax = v2[0] - v1[0];
-	double ay = v2[1] - v1[1];
-	double bx = v0[0] - v2[0];
-	double by = v0[1] - v2[1];
-	double cx = v1[0] - v0[0];
-	double cy = v1[1] - v0[1];
-	double apx = pt[0] - v0[0];
-	double apy = pt[1] - v0[1];
-	double bpx = pt[0] - v1[0];
-	double bpy = pt[1] - v1[1];
-	double cpx = pt[0] - v2[0];
-	double cpy = pt[1] - v2[1];
+	double ax = (double)(v2[0] - v1[0]);
+	double ay = (double)(v2[1] - v1[1]);
+	double bx = (double)(v0[0] - v2[0]);
+	double by = (double)(v0[1] - v2[1]);
+	double cx = (double)(v1[0] - v0[0]);
+	double cy = (double)(v1[1] - v0[1]);
+	double apx = (double)(pt[0] - v0[0]);
+	double apy = (double)(pt[1] - v0[1]);
+	double bpx = (double)(pt[0] - v1[0]);
+	double bpy = (double)(pt[1] - v1[1]);
+	double cpx = (double)(pt[0] - v2[0]);
+	double cpy = (double)(pt[1] - v2[1]);
 	double s0 = ax * bpy - ay * bpx;
 	double s1 = cx * apy - cy * apx;
 	double s2 = bx * cpy - by * cpx;

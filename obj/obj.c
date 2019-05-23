@@ -589,7 +589,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 			}
 
 			remain.str += end_line;
-			remain.length -= end_line;
+			remain.length = (remain.length > end_line) ? (remain.length - end_line) : 0;
 
 			remain = skip_whitespace_and_endline(STRING_ARGS(remain));
 			last_remain = remain.length;

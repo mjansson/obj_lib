@@ -153,6 +153,5 @@ struct obj_t {
 	obj_vertex_t* vertex;
 	obj_normal_t* normal;
 	obj_uv_t* uv;
-	obj_corner_t* corner;
 	obj_group_t** group;
 };

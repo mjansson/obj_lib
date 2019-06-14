@@ -311,7 +311,10 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 			}
 
 			remain.str += end_line;
-			remain.length -= end_line;
+			if (end_line < remain.length)
+				remain.length -= end_line;
+			else
+				remain.length = 0;
 
 			remain = skip_whitespace_and_endline(STRING_ARGS(remain));
 			last_remain = remain.length;

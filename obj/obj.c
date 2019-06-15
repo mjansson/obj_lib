@@ -194,7 +194,7 @@ material_default(void) {
 	return material;
 }
 
-int
+bool
 load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	stream_t* stream = nullptr;
 	if (_obj_config.stream_open) {
@@ -214,7 +214,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 		}
 	}
 	if (!stream)
-		return 1;
+		return false;
 
 	const size_t buffer_capacity = 4000;
 	char* buffer = memory_allocate(HASH_OBJ, buffer_capacity, 0, MEMORY_PERSISTENT);
@@ -332,10 +332,10 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	memory_deallocate(buffer);
 	stream_deallocate(stream);
 
-	return 0;
+	return true;
 }
 
-int
+bool
 obj_read(obj_t* obj, stream_t* stream) {
 	size_t file_size = stream_size(stream);
 	size_t reserve_count = file_size / 128;
@@ -606,14 +606,14 @@ obj_read(obj_t* obj, stream_t* stream) {
 	array_deallocate(vertex_to_corner);
 	memory_deallocate(buffer);
 
-	return 0;
+	return true;
 }
 
-int
+bool
 obj_write(const obj_t* obj, stream_t* stream) {
 	FOUNDATION_UNUSED(obj);
 	FOUNDATION_UNUSED(stream);
-	return -1;
+	return false;
 }
 
 static void
@@ -879,7 +879,7 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 	return triangle_count;
 }
 
-static int
+static bool
 obj_triangulate_subgroup(obj_t* obj, obj_subgroup_t* subgroup) {
 	array_clear(subgroup->triangle);
 	array_reserve(subgroup->triangle, 3 * array_size(subgroup->face));
@@ -899,13 +899,13 @@ obj_triangulate_subgroup(obj_t* obj, obj_subgroup_t* subgroup) {
 			    triangulate_concave(subgroup->index + face->offset, subgroup->corner, obj->vertex,
 			                        face->count, &subgroup->triangle);
 	}
-	return 0;
+	return true;
 }
 
-int
+bool
 obj_triangulate(obj_t* obj) {
 	if (!obj)
-		return -1;
+		return false;
 	for (unsigned int igroup = 0, gsize = array_size(obj->group); igroup < gsize; ++igroup) {
 		obj_group_t* group = obj->group[igroup];
 		for (unsigned int isubgroup = 0, sgsize = array_size(group->subgroup); isubgroup < sgsize;
@@ -913,10 +913,9 @@ obj_triangulate(obj_t* obj) {
 			obj_subgroup_t* subgroup = group->subgroup[isubgroup];
 			if (subgroup->triangle_count)
 				continue;
-			int err = obj_triangulate_subgroup(obj, subgroup);
-			if (err)
-				return err;
+			if (!obj_triangulate_subgroup(obj, subgroup))
+				return false;
 		}
 	}
-	return 0;
+	return true;
 }

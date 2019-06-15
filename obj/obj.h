@@ -61,19 +61,19 @@ obj_finalize(obj_t* obj);
 /*! Read OBJ data
 \param obj Target OBJ data structure
 \param stream Source stream
-\return 0 if success, <0 if error */
-OBJ_API int
+\return true if success, false if error */
+OBJ_API bool
 obj_read(obj_t* obj, stream_t* stream);
 
 /*! Write OBJ data
 \param obj Source OBJ data structure
 \param stream Target stream
-\return 0 if successful, <0 if error */
-OBJ_API int
+\return true if successful, false if error */
+OBJ_API bool
 obj_write(const obj_t* obj, stream_t* stream);
 
 /*! Triangulate OBJ data
 \param obj Source OBJ data structure
-\return 0 if successful, <0 if error */
-OBJ_API int
+\return true if successful, false if error */
+OBJ_API bool
 obj_triangulate(obj_t* obj);

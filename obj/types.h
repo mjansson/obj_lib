@@ -122,9 +122,9 @@ struct obj_corner_t {
 
 struct obj_face_t {
 	//! Number of indices in face
-	int count;
+	unsigned int count;
 	//! Offset in subgroup index array where face indices start
-	int offset;
+	unsigned int offset;
 };
 
 struct obj_subgroup_t {

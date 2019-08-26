@@ -142,22 +142,6 @@ skip_whitespace_and_endline(const char* buffer, size_t length) {
 	return string_const(buffer + pos, length - pos);
 }
 
-static string_const_t
-skip_line(const char* buffer, size_t length) {
-	size_t pos = 0;
-	while (pos < length) {
-		if (is_endline(buffer[pos]))
-			break;
-		++pos;
-	}
-	while (pos < length) {
-		if (!is_endline(buffer[pos]))
-			break;
-		++pos;
-	}
-	return string_const(buffer + pos, length - pos);
-}
-
 static void
 set_color(obj_color_t* color, real red, real green, real blue) {
 	color->red = red;
@@ -181,9 +165,10 @@ parse_color(const string_const_t* tokens, size_t num_tokens) {
 	return color;
 }
 
-obj_material_t
+static obj_material_t
 material_default(void) {
-	obj_material_t material = {0};
+	obj_material_t material;
+	memset(&material, 0, sizeof(material));
 	set_color(&material.ambient_color, 0, 0, 0);
 	set_color(&material.diffuse_color, 1, 1, 1);
 	set_color(&material.specular_color, 0, 0, 0);
@@ -194,7 +179,7 @@ material_default(void) {
 	return material;
 }
 
-bool
+static bool
 load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	stream_t* stream = nullptr;
 	if (_obj_config.stream_open) {
@@ -220,7 +205,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	char* buffer = memory_allocate(HASH_OBJ, buffer_capacity, 0, MEMORY_PERSISTENT);
 
 	bool material_valid = false;
-	obj_material_t material = {0};
+	obj_material_t material = material_default();
 
 	while (!stream_eos(stream)) {
 		size_t last_remain = 0;
@@ -494,52 +479,55 @@ obj_read(obj_t* obj, stream_t* stream) {
 					size_t num_corner_tokens = string_explode(
 					    STRING_ARGS(tokens[icorner]), STRING_CONST("/"), corner_token, 3, true);
 
-					int ivert = 0;
-					int iuv = 0;
-					int inorm = 0;
+					int relvert = 0;
+					int reluv = 0;
+					int relnorm = 0;
 					if (num_corner_tokens)
-						ivert = string_to_int(STRING_ARGS(corner_token[0]));
+						relvert = string_to_int(STRING_ARGS(corner_token[0]));
 					if (num_corner_tokens > 1)
-						iuv = string_to_int(STRING_ARGS(corner_token[1]));
+						reluv = string_to_int(STRING_ARGS(corner_token[1]));
 					if (num_corner_tokens > 2)
-						inorm = string_to_int(STRING_ARGS(corner_token[2]));
+						relnorm = string_to_int(STRING_ARGS(corner_token[2]));
 
-					if (ivert < 0)
-						ivert = array_size(obj->vertex) + ivert + 1;
-					if (inorm < 0)
-						inorm = array_size(obj->normal) + inorm + 1;
-					if (iuv < 0)
-						iuv = array_size(obj->uv) + iuv + 1;
+					if (relvert < 0)
+						relvert += (int)array_size(obj->vertex) + + 1;
+					if (relnorm < 0)
+						relnorm = (int)array_size(obj->normal) + + 1;
+					if (reluv < 0)
+						reluv = (int)array_size(obj->uv) + + 1;
 
-					if ((ivert <= 0) || (ivert > (int)array_size(obj->vertex)))
+					if ((relvert <= 0) || (relvert > (int)array_size(obj->vertex)))
 						valid_face = false;
-					if ((inorm <= 0) || (inorm > (int)array_size(obj->normal)))
-						inorm = 0;
-					if ((iuv <= 0) || (iuv > (int)array_size(obj->uv)))
-						iuv = 0;
+					if ((relnorm <= 0) || (relnorm > (int)array_size(obj->normal)))
+						relnorm = 0;
+					if ((reluv <= 0) || (reluv > (int)array_size(obj->uv)))
+						reluv = 0;
 
 					if (valid_face) {
 						unsigned int corner_index;
 						unsigned int corner_count = array_size(current_subgroup->corner);
-						if ((ivert > (int)array_size(vertex_to_corner)) ||
+						unsigned int ivert = (unsigned int)relvert;
+						unsigned int inorm = (unsigned int)relvert;
+						unsigned int iuv = (unsigned int)relvert;
+						if ((ivert > array_size(vertex_to_corner)) ||
 						    (vertex_to_corner[ivert - 1] < 0)) {
 							obj_corner_t corner = {ivert, inorm, iuv, -1};
 							corner_index = array_size(current_subgroup->corner);
 							array_push(current_subgroup->corner, corner);
-							if (ivert > (int)array_size(vertex_to_corner)) {
+							if (ivert > array_size(vertex_to_corner)) {
 								unsigned int prev_size = array_size(vertex_to_corner);
 								array_resize(vertex_to_corner, ivert);
 								memset(vertex_to_corner + prev_size, 0xFF,
 								       sizeof(int) * (ivert - prev_size));
 							}
-							vertex_to_corner[ivert - 1] = corner_index;
+							vertex_to_corner[ivert - 1] = (int)corner_index;
 						} else {
-							corner_index = vertex_to_corner[ivert - 1];
+							corner_index = (unsigned int)vertex_to_corner[ivert - 1];
 							unsigned int last_corner = (unsigned int)-1;
 							while (corner_index < corner_count) {
 								obj_corner_t* corner = current_subgroup->corner + corner_index;
-								if (!corner->normal || !inorm || ((int)corner->normal == inorm)) {
-									if (!corner->uv || !iuv || ((int)corner->uv == iuv)) {
+								if (!corner->normal || !inorm || (corner->normal == inorm)) {
+									if (!corner->uv || !iuv || (corner->uv == iuv)) {
 										if (inorm && !corner->normal)
 											corner->normal = inorm;
 										if (iuv && !corner->uv)
@@ -555,7 +543,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 								corner_index = array_size(current_subgroup->corner);
 								array_push(current_subgroup->corner, corner);
 								if (last_corner < corner_count)
-									current_subgroup->corner[last_corner].next = corner_index;
+									current_subgroup->corner[last_corner].next = (int)corner_index;
 							}
 						}
 						array_push(current_subgroup->index, corner_index);
@@ -654,9 +642,9 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 	if (corner_count < 4)
 		return true;
 
-	int prev_corner;
-	int cur_corner = index[0];
-	int next_corner = index[1];
+	unsigned int prev_corner;
+	unsigned int cur_corner = index[0];
+	unsigned int next_corner = index[1];
 
 	obj_vertex_t* next_vertex = vertex + (corner[next_corner].vertex - 1);
 	obj_vertex_t* cur_vertex = vertex + (corner[cur_corner].vertex - 1);

@@ -490,11 +490,11 @@ obj_read(obj_t* obj, stream_t* stream) {
 						relnorm = string_to_int(STRING_ARGS(corner_token[2]));
 
 					if (relvert < 0)
-						relvert += (int)array_size(obj->vertex) + + 1;
+						relvert += (int)array_size(obj->vertex) + 1;
 					if (relnorm < 0)
-						relnorm = (int)array_size(obj->normal) + + 1;
+						relnorm = (int)array_size(obj->normal) + 1;
 					if (reluv < 0)
-						reluv = (int)array_size(obj->uv) + + 1;
+						reluv = (int)array_size(obj->uv) + 1;
 
 					if ((relvert <= 0) || (relvert > (int)array_size(obj->vertex)))
 						valid_face = false;
@@ -507,8 +507,8 @@ obj_read(obj_t* obj, stream_t* stream) {
 						unsigned int corner_index;
 						unsigned int corner_count = array_size(current_subgroup->corner);
 						unsigned int ivert = (unsigned int)relvert;
-						unsigned int inorm = (unsigned int)relvert;
-						unsigned int iuv = (unsigned int)relvert;
+						unsigned int inorm = (unsigned int)relnorm;
+						unsigned int iuv = (unsigned int)reluv;
 						if ((ivert > array_size(vertex_to_corner)) ||
 						    (vertex_to_corner[ivert - 1] < 0)) {
 							obj_corner_t corner = {ivert, inorm, iuv, -1};

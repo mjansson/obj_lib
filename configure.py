@@ -33,7 +33,7 @@ if generator.is_subninja():
 
 includepaths = generator.test_includepaths()
 
-linklibs = ['test'] + dependlibs
+linklibs = ['test', 'obj'] + dependlibs
 
 test_cases = ['obj']
 if toolchain.is_monolithic() or target.is_ios() or target.is_android() or target.is_tizen():

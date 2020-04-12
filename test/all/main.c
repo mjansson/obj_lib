@@ -1,17 +1,17 @@
-/* main.c  -  Foundation test launcher  -  Public Domain  -  2013 Mattias Jansson / Rampant Pixels
+/* main.c  -  Foundation test launcher  -  Public Domain  -  2013 Mattias Jansson
  *
  * This library provides a cross-platform foundation library in C11 providing basic support
  * data types and functions to write applications and games in a platform-independent fashion.
  * The latest source code is always available at
  *
- * https://github.com/rampantpixels/foundation_lib
+ * https://github.com/mjansson/foundation_lib
  *
  * This library is put in the public domain; you can redistribute it and/or modify it without
  * any restrictions.
  */
 
 #include <foundation/foundation.h>
-#include <gltf/gltf.h>
+#include <obj/obj.h>
 #include <test/test.h>
 
 static volatile bool _test_should_start;
@@ -31,33 +31,34 @@ event_loop(void* arg) {
 		event = 0;
 		while ((event = event_next(block, event))) {
 			switch (event->id) {
-			case FOUNDATIONEVENT_START:
+				case FOUNDATIONEVENT_START:
 #if FOUNDATION_PLATFORM_IOS || FOUNDATION_PLATFORM_ANDROID
-				log_debug(HASH_TEST, STRING_CONST("Application start event received"));
-				_test_should_start = true;
+					log_debug(HASH_TEST, STRING_CONST("Application start event received"));
+					_test_should_start = true;
 #endif
-				break;
+					break;
 
-			case FOUNDATIONEVENT_TERMINATE:
+				case FOUNDATIONEVENT_TERMINATE:
 #if FOUNDATION_PLATFORM_IOS || FOUNDATION_PLATFORM_ANDROID
-				log_debug(HASH_TEST, STRING_CONST("Application stop/terminate event received"));
-				_test_should_terminate = true;
-				break;
+					log_debug(HASH_TEST, STRING_CONST("Application stop/terminate event received"));
+					_test_should_terminate = true;
+					break;
 #else
-				log_warn(HASH_TEST, WARNING_SUSPICIOUS, STRING_CONST("Terminating tests due to event"));
-				process_exit(-2);
+					log_warn(HASH_TEST, WARNING_SUSPICIOUS,
+					         STRING_CONST("Terminating tests due to event"));
+					process_exit(-2);
 #endif
 
-			case FOUNDATIONEVENT_FOCUS_GAIN:
-				_test_have_focus = true;
-				break;
+				case FOUNDATIONEVENT_FOCUS_GAIN:
+					_test_have_focus = true;
+					break;
 
-			case FOUNDATIONEVENT_FOCUS_LOST:
-				_test_have_focus = false;
-				break;
+				case FOUNDATIONEVENT_FOCUS_LOST:
+					_test_have_focus = false;
+					break;
 
-			default:
-				break;
+				default:
+					break;
 			}
 		}
 		thread_wait();
@@ -68,7 +69,7 @@ event_loop(void* arg) {
 	return 0;
 }
 
-#if ( FOUNDATION_PLATFORM_IOS || FOUNDATION_PLATFORM_ANDROID ) && BUILD_ENABLE_LOG
+#if (FOUNDATION_PLATFORM_IOS || FOUNDATION_PLATFORM_ANDROID) && BUILD_ENABLE_LOG
 
 #if FOUNDATION_PLATFORM_ANDROID
 #include <foundation/android.h>
@@ -87,15 +88,15 @@ test_log_handler(hash_t context, error_level_t severity, const char* msg, size_t
 		return;
 
 #if FOUNDATION_PLATFORM_IOS
-	test_text_view_append(delegate_uiwindow(), 1 , msg, length);
+	test_text_view_append(delegate_uiwindow(), 1, msg, length);
 #elif FOUNDATION_PLATFORM_ANDROID
 	jclass _test_log_class = 0;
 	jmethodID _test_log_append = 0;
 	const struct JNINativeInterface** jnienv = thread_attach_jvm();
 	_test_log_class = (*jnienv)->GetObjectClass(jnienv, android_app()->activity->clazz);
 	if (_test_log_class)
-		_test_log_append = (*jnienv)->GetMethodID(jnienv, _test_log_class, "appendLog",
-		                                          "(Ljava/lang/String;)V");
+		_test_log_append =
+		    (*jnienv)->GetMethodID(jnienv, _test_log_class, "appendLog", "(Ljava/lang/String;)V");
 	if (_test_log_append) {
 		jstring jstr = (*jnienv)->NewStringUTF(jnienv, msg);
 		(*jnienv)->CallVoidMethod(jnienv, android_app()->activity->clazz, _test_log_append, jstr);
@@ -128,23 +129,23 @@ test_should_terminate(void) {
 int
 main_initialize(void) {
 	foundation_config_t config;
-	gltf_config_t gltf_config;
+	obj_config_t obj_config;
 	application_t application;
 
 	memset(&config, 0, sizeof(config));
-	memset(&gltf_config, 0, sizeof(gltf_config));
+	memset(&obj_config, 0, sizeof(obj_config));
 
 	memset(&application, 0, sizeof(application));
-	application.name = string_const(STRING_CONST("glTF library test suite"));
+	application.name = string_const(STRING_CONST("OBJ library test suite"));
 	application.short_name = string_const(STRING_CONST("test_all"));
-	application.company = string_const(STRING_CONST("Rampant Pixels"));
+	application.company = string_const(STRING_CONST(""));
 	application.version = foundation_version();
 	application.flags = APPLICATION_UTILITY;
 	application.exception_handler = test_exception_handler;
 
 	log_set_suppress(0, ERRORLEVEL_INFO);
 
-#if ( FOUNDATION_PLATFORM_IOS || FOUNDATION_PLATFORM_ANDROID ) && BUILD_ENABLE_LOG
+#if (FOUNDATION_PLATFORM_IOS || FOUNDATION_PLATFORM_ANDROID) && BUILD_ENABLE_LOG
 	log_set_handler(test_log_handler);
 #endif
 
@@ -161,15 +162,16 @@ main_initialize(void) {
 	test_set_suitable_working_directory();
 #endif
 
-	return gltf_module_initialize(gltf_config);
+	return obj_module_initialize(obj_config);
 }
 
 #if FOUNDATION_PLATFORM_ANDROID
-#  include <foundation/android.h>
+#include <foundation/android.h>
 #endif
 
 #if BUILD_MONOLITHIC
-extern int test_gltf_run( void );
+extern int
+test_gltf_run(void);
 typedef int (*test_run_fn)(void);
 
 static void*
@@ -196,7 +198,7 @@ main_run(void* main_arg) {
 	string_t* exe_paths = 0;
 	size_t iexe, exesize;
 	process_t* process = 0;
-	string_t process_path = { 0, 0 };
+	string_t process_path = {0, 0};
 	unsigned int* exe_flags = 0;
 #else
 	void* test_result;
@@ -221,11 +223,12 @@ main_run(void* main_arg) {
 
 	log_set_suppress(HASH_TEST, ERRORLEVEL_DEBUG);
 
-	log_infof(HASH_TEST, STRING_CONST("glTF library v%s built for %s using %s (%s)"),
-	          string_from_version_static(gltf_module_version()).str, FOUNDATION_PLATFORM_DESCRIPTION,
-	          FOUNDATION_COMPILER_DESCRIPTION, build_name.str);
+	log_infof(HASH_TEST, STRING_CONST("OBJ library v%s built for %s using %s (%s)"),
+	          string_from_version_static(obj_module_version()).str,
+	          FOUNDATION_PLATFORM_DESCRIPTION, FOUNDATION_COMPILER_DESCRIPTION, build_name.str);
 
-	thread_initialize(&event_thread, event_loop, 0, STRING_CONST("event_thread"), THREAD_PRIORITY_NORMAL, 0);
+	thread_initialize(&event_thread, event_loop, 0, STRING_CONST("event_thread"),
+	                  THREAD_PRIORITY_NORMAL, 0);
 	thread_start(&event_thread);
 
 	pathbuf = memory_allocate(HASH_STRING, BUILD_MAX_PATHLEN, 0, MEMORY_PERSISTENT);
@@ -246,10 +249,7 @@ main_run(void* main_arg) {
 
 #if BUILD_MONOLITHIC
 
-	test_run_fn tests[] = {
-		test_gltf_run,
-		0
-	};
+	test_run_fn tests[] = {test_gltf_run, 0};
 
 #if FOUNDATION_PLATFORM_ANDROID
 
@@ -272,7 +272,7 @@ main_run(void* main_arg) {
 
 	test_result = thread_join(&test_thread);
 	process_result = (int)(intptr_t)test_result;
-	
+
 	thread_finalize(&test_thread);
 
 #else
@@ -298,9 +298,9 @@ main_run(void* main_arg) {
 
 	log_debug(HASH_TEST, STRING_CONST("Exiting main loop"));
 
-#else // !BUILD_MONOLITHIC
+#else  // !BUILD_MONOLITHIC
 
-	//Find all test executables in the current executable directory
+	// Find all test executables in the current executable directory
 #if FOUNDATION_PLATFORM_WINDOWS
 	pattern = string_const(STRING_CONST("^test-.*\\.exe$"));
 #elif FOUNDATION_PLATFORM_MACOS
@@ -308,20 +308,20 @@ main_run(void* main_arg) {
 #elif FOUNDATION_PLATFORM_POSIX
 	pattern = string_const(STRING_CONST("^test-.*$"));
 #else
-#  error Not implemented
+#error Not implemented
 #endif
 	exe_paths = fs_matching_files(STRING_ARGS(environment_executable_directory()),
 	                              STRING_ARGS(pattern), false);
 	array_resize(exe_flags, array_size(exe_paths));
 	memset(exe_flags, 0, sizeof(unsigned int) * array_size(exe_flags));
 #if FOUNDATION_PLATFORM_MACOS
-	//Also search for test applications
+	// Also search for test applications
 	string_const_t app_pattern = string_const(STRING_CONST("^test-.*\\.app$"));
 	regex_t* app_regex = regex_compile(app_pattern.str, app_pattern.length);
 	string_t* subdirs = fs_subdirs(STRING_ARGS(environment_executable_directory()));
 	for (size_t idir = 0, dirsize = array_size(subdirs); idir < dirsize; ++idir) {
 		if (regex_match(app_regex, subdirs[idir].str, subdirs[idir].length, 0, 0)) {
-			string_t exe_path = { subdirs[idir].str, subdirs[idir].length - 4 };
+			string_t exe_path = {subdirs[idir].str, subdirs[idir].length - 4};
 			array_push(exe_paths, exe_path);
 			array_push(exe_flags, PROCESS_MACOS_USE_OPENAPPLICATION);
 		}
@@ -332,11 +332,11 @@ main_run(void* main_arg) {
 	for (iexe = 0, exesize = array_size(exe_paths); iexe < exesize; ++iexe) {
 		string_const_t exe_file_name = path_base_file_name(STRING_ARGS(exe_paths[iexe]));
 		if (string_equal(STRING_ARGS(exe_file_name), STRING_ARGS(environment_executable_name())))
-			continue; //Don't run self
+			continue;  // Don't run self
 
-		process_path = path_concat(pathbuf, BUILD_MAX_PATHLEN,
-		                           STRING_ARGS(environment_executable_directory()),
-		                           STRING_ARGS(exe_paths[iexe]));
+		process_path =
+		    path_concat(pathbuf, BUILD_MAX_PATHLEN, STRING_ARGS(environment_executable_directory()),
+		                STRING_ARGS(exe_paths[iexe]));
 		process = process_allocate();
 
 		process_set_executable_path(process, STRING_ARGS(process_path));
@@ -359,8 +359,8 @@ main_run(void* main_arg) {
 				          STRING_CONST("Tests failed, process terminated with error %x"),
 				          process_result);
 			else
-				log_warnf(HASH_TEST, WARNING_SUSPICIOUS, STRING_CONST("Tests failed with exit code %d"),
-				          process_result);
+				log_warnf(HASH_TEST, WARNING_SUSPICIOUS,
+				          STRING_CONST("Tests failed with exit code %d"), process_result);
 			process_set_exit_code(-1);
 			goto exit;
 		}
@@ -398,6 +398,6 @@ main_finalize(void) {
 	thread_detach_jvm();
 #endif
 
-	gltf_module_finalize();
+	obj_module_finalize();
 	foundation_finalize();
 }

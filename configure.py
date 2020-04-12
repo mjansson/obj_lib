@@ -9,9 +9,9 @@ sys.path.insert(0, os.path.join('build', 'ninja'))
 
 import generator
 
-dependlibs = ['foundation']
+dependlibs = ['mesh', 'foundation']
 
-generator = generator.Generator(project = 'obj', dependlibs = dependlibs, variables = [('bundleidentifier', 'com.rampantpixels.obj.$(binname)')])
+generator = generator.Generator(project = 'obj', dependlibs = dependlibs, variables = [('bundleidentifier', 'com.maniccoder.obj.$(binname)')])
 target = generator.target
 writer = generator.writer
 toolchain = generator.toolchain
@@ -35,7 +35,7 @@ includepaths = generator.test_includepaths()
 
 linklibs = ['test'] + dependlibs
 
-test_cases = []
+test_cases = ['obj']
 if toolchain.is_monolithic() or target.is_ios() or target.is_android() or target.is_tizen():
   #Build one fat binary with all test cases
   test_resources = []
@@ -50,7 +50,7 @@ if toolchain.is_monolithic() or target.is_ios() or target.is_android() or target
       os.path.join('drawable-ldpi', 'icon.png'), os.path.join('drawable-mdpi', 'icon.png'), os.path.join('drawable-hdpi', 'icon.png'),
       os.path.join('drawable-xhdpi', 'icon.png'), os.path.join('drawable-xxhdpi', 'icon.png'), os.path.join('drawable-xxxhdpi', 'icon.png')
     ]]
-    test_extrasources = [os.path.join('all', 'android', 'java', 'com', 'rampantpixels', 'obj', 'test', item) for item in [
+    test_extrasources = [os.path.join('all', 'android', 'java', 'com', 'maniccoder', 'obj', 'test', item) for item in [
       'TestActivity.java'
     ]]
   elif target.is_tizen():

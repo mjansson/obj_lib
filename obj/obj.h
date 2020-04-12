@@ -1,11 +1,11 @@
-/* obj.h  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson / Rampant Pixels
+/* obj.h  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson
  *
  * This library provides a cross-platform OBJ I/O library in C11 providing
  * OBJ ascii reading and writing functionality.
  *
- * The latest source code maintained by Rampant Pixels is always available at
+ * The latest source code maintained by Mattias Jansson is always available at
  *
- * https://github.com/rampantpixels/obj_lib
+ * https://github.com/mjansson/obj_lib
  *
  * This library is put in the public domain; you can redistribute it and/or modify it without any
  * restrictions.
@@ -77,3 +77,15 @@ obj_write(const obj_t* obj, stream_t* stream);
 \return true if successful, false if error */
 OBJ_API bool
 obj_triangulate(obj_t* obj);
+
+/*! Transcode OBJ data to mesh
+\param obj Source OBJ data structure
+\param mesh Destination mesh data structure */
+OBJ_API void
+obj_to_mesh(obj_t* obj, mesh_t* mesh);
+
+/*! Transcode mesh data to obj
+\param mesh Source mesh data structure
+\param obj Destination OBJ data structure */
+OBJ_API void
+obj_from_mesh(mesh_t* mesh, obj_t* obj);

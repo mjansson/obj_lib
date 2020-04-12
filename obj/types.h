@@ -1,11 +1,11 @@
-/* types.h  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson / Rampant Pixels
+/* types.h  -  OBJ library  -  Public Domain  -  2019 Mattias Jansson
  *
  * This library provides a cross-platform OBJ I/O library in C11 providing
  * OBJ ascii reading and writing functionality.
  *
- * The latest source code maintained by Rampant Pixels is always available at
+ * The latest source code maintained by Mattias Jansson is always available at
  *
- * https://github.com/rampantpixels/obj_lib
+ * https://github.com/mjansson/obj_lib
  *
  * This library is put in the public domain; you can redistribute it and/or modify it without any
  * restrictions.
@@ -53,6 +53,9 @@ typedef struct obj_corner_t obj_corner_t;
 typedef struct obj_face_t obj_face_t;
 typedef struct obj_subgroup_t obj_subgroup_t;
 typedef struct obj_group_t obj_group_t;
+
+//! Extern data structures
+typedef struct mesh_t mesh_t;
 
 struct obj_config_t {
 	obj_stream_open stream_open;

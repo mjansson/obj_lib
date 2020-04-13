@@ -39,13 +39,13 @@ obj_module_is_initialized(void) {
 
 void
 obj_module_parse_config(const char* path, size_t path_size, const char* buffer, size_t size,
-                        const struct json_token_t* tokens, size_t num_tokens) {
+                        const struct json_token_t* tokens, size_t tokens_count) {
 	FOUNDATION_UNUSED(path);
 	FOUNDATION_UNUSED(path_size);
 	FOUNDATION_UNUSED(buffer);
 	FOUNDATION_UNUSED(size);
 	FOUNDATION_UNUSED(tokens);
-	FOUNDATION_UNUSED(num_tokens);
+	FOUNDATION_UNUSED(tokens_count);
 }
 
 void
@@ -150,15 +150,15 @@ set_color(obj_color_t* color, real red, real green, real blue) {
 }
 
 static obj_color_t
-parse_color(const string_const_t* tokens, size_t num_tokens) {
+parse_color(const string_const_t* tokens, size_t tokens_count) {
 	obj_color_t color = {0};
-	if (num_tokens)
+	if (tokens_count)
 		color.red = string_to_real(STRING_ARGS(tokens[0]));
-	if (num_tokens > 1)
+	if (tokens_count > 1)
 		color.green = string_to_real(STRING_ARGS(tokens[1]));
 	else
 		color.green = color.red;
-	if (num_tokens > 2)
+	if (tokens_count > 2)
 		color.blue = string_to_real(STRING_ARGS(tokens[2]));
 	else
 		color.blue = color.green;
@@ -192,8 +192,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 			string_deallocate(testpath.str);
 		}
 		for (size_t ipath = 0; !stream && ipath < _obj_config.search_path_count; ++ipath) {
-			string_t testpath =
-			    path_allocate_concat(STRING_ARGS(_obj_config.search_path[ipath]), filename, length);
+			string_t testpath = path_allocate_concat(STRING_ARGS(_obj_config.search_path[ipath]), filename, length);
 			stream = stream_open(STRING_ARGS(testpath), STREAM_IN);
 			string_deallocate(testpath.str);
 		}
@@ -218,13 +217,13 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 
 		remain = skip_whitespace_and_endline(STRING_ARGS(remain));
 		while (remain.length > 3) {
-			size_t num_tokens = 0;
+			size_t tokens_count = 0;
 			size_t offset = 1;
 
 			while (remain.length && (offset < remain.length)) {
 				if (is_whitespace(remain.str[offset]) || is_endline(remain.str[offset])) {
-					if (offset && (num_tokens < tokens_capacity)) {
-						tokens_storage[num_tokens++] = string_const(remain.str, offset);
+					if (offset && (tokens_count < tokens_capacity)) {
+						tokens_storage[tokens_count++] = string_const(remain.str, offset);
 					}
 					if (is_endline(remain.str[offset]))
 						break;
@@ -242,14 +241,14 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 					break;
 				++end_line;
 				last_remain = 0;
-				if (num_tokens < tokens_capacity)
-					tokens_storage[num_tokens++] = remain;
+				if (tokens_count < tokens_capacity)
+					tokens_storage[tokens_count++] = remain;
 			}
-			if (!num_tokens)
+			if (!tokens_count)
 				break;
 
 			string_const_t command = tokens_storage[0];
-			--num_tokens;
+			--tokens_count;
 
 			if (string_equal(STRING_ARGS(command), STRING_CONST("newmtl"))) {
 				if (material_valid)
@@ -257,27 +256,26 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 				else
 					obj_finalize_material(&material);
 				material = material_default();
-				material.name = (num_tokens && tokens[0].length) ?
-				                    string_clone(STRING_ARGS(tokens[0])) :
-				                    string_clone(STRING_CONST("__unnamed"));
+				material.name = (tokens_count && tokens[0].length) ? string_clone(STRING_ARGS(tokens[0])) :
+				                                                     string_clone(STRING_CONST("__unnamed"));
 				material_valid = true;
-			} else if (string_equal(STRING_ARGS(command), STRING_CONST("d")) && num_tokens) {
+			} else if (string_equal(STRING_ARGS(command), STRING_CONST("d")) && tokens_count) {
 				material.dissolve_factor = string_to_real(STRING_ARGS(tokens[0]));
-			} else if (num_tokens && (command.str[0] == 'K')) {
+			} else if (tokens_count && (command.str[0] == 'K')) {
 				if (string_equal(STRING_ARGS(command), STRING_CONST("Ka"))) {
-					material.ambient_color = parse_color(tokens, num_tokens);
+					material.ambient_color = parse_color(tokens, tokens_count);
 				} else if (string_equal(STRING_ARGS(command), STRING_CONST("Kd"))) {
-					material.diffuse_color = parse_color(tokens, num_tokens);
+					material.diffuse_color = parse_color(tokens, tokens_count);
 				} else if (string_equal(STRING_ARGS(command), STRING_CONST("Ks"))) {
-					material.specular_color = parse_color(tokens, num_tokens);
+					material.specular_color = parse_color(tokens, tokens_count);
 				} else if (string_equal(STRING_ARGS(command), STRING_CONST("Ke"))) {
-					material.emissive_color = parse_color(tokens, num_tokens);
+					material.emissive_color = parse_color(tokens, tokens_count);
 				}
-			} else if (string_equal(STRING_ARGS(command), STRING_CONST("Ns")) && num_tokens) {
+			} else if (string_equal(STRING_ARGS(command), STRING_CONST("Ns")) && tokens_count) {
 				material.shininess_exponent = string_to_real(STRING_ARGS(tokens[0]));
-			} else if (string_equal(STRING_ARGS(command), STRING_CONST("Tf")) && num_tokens) {
-				material.transmission_filter = parse_color(tokens, num_tokens);
-			} else if (num_tokens && (command.str[0] == 'm')) {
+			} else if (string_equal(STRING_ARGS(command), STRING_CONST("Tf")) && tokens_count) {
+				material.transmission_filter = parse_color(tokens, tokens_count);
+			} else if (tokens_count && (command.str[0] == 'm')) {
 				if (string_equal(STRING_ARGS(command), STRING_CONST("map_Ka"))) {
 					material.ambient_texture = string_clone(STRING_ARGS(tokens[0]));
 				} else if (string_equal(STRING_ARGS(command), STRING_CONST("map_Kd"))) {
@@ -350,7 +348,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 	obj_group_t* current_group = nullptr;
 	obj_subgroup_t* current_subgroup = nullptr;
 
-	size_t num_vertex_since_group = 0;
+	size_t vertex_count_since_group = 0;
 	string_t group_name = {0};
 	unsigned int material_index = INVALID_INDEX;
 
@@ -366,13 +364,13 @@ obj_read(obj_t* obj, stream_t* stream) {
 
 		remain = skip_whitespace_and_endline(STRING_ARGS(remain));
 		while (remain.length > 3) {
-			size_t num_tokens = 0;
+			size_t tokens_count = 0;
 			size_t offset = 1;
 
 			while (remain.length && (offset < remain.length)) {
 				if (is_whitespace(remain.str[offset]) || is_endline(remain.str[offset])) {
-					if (offset && (num_tokens < tokens_capacity))
-						tokens_storage[num_tokens++] = string_const(remain.str, offset);
+					if (offset && (tokens_count < tokens_capacity))
+						tokens_storage[tokens_count++] = string_const(remain.str, offset);
 					if (is_endline(remain.str[offset]))
 						break;
 					remain = skip_whitespace(remain.str + offset, remain.length - offset);
@@ -389,33 +387,31 @@ obj_read(obj_t* obj, stream_t* stream) {
 					break;
 				++end_line;
 				last_remain = 0;
-				if (num_tokens < tokens_capacity)
-					tokens_storage[num_tokens++] = remain;
+				if (tokens_count < tokens_capacity)
+					tokens_storage[tokens_count++] = remain;
 			}
-			if (!num_tokens)
+			if (!tokens_count)
 				break;
 
 			string_const_t command = tokens_storage[0];
-			--num_tokens;
+			--tokens_count;
 
 			if (string_equal(STRING_ARGS(command), STRING_CONST("v"))) {
-				if (num_tokens >= 2) {
-					obj_vertex_t vertex = {
-					    string_to_real(STRING_ARGS(tokens[0])),
-					    string_to_real(STRING_ARGS(tokens[1])),
-					    (num_tokens > 2) ? string_to_real(STRING_ARGS(tokens[2])) : 0.0f};
+				if (tokens_count >= 2) {
+					obj_vertex_t vertex = {string_to_real(STRING_ARGS(tokens[0])),
+					                       string_to_real(STRING_ARGS(tokens[1])),
+					                       (tokens_count > 2) ? string_to_real(STRING_ARGS(tokens[2])) : 0.0f};
 					array_push(obj->vertex, vertex);
 				} else {
 					obj_vertex_t vertex = {0, 0, 0};
 					array_push(obj->vertex, vertex);
 				}
-				++num_vertex_since_group;
+				++vertex_count_since_group;
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("vt"))) {
 				if (!array_capacity(obj->uv))
 					array_reserve(obj->uv, reserve_count);
-				if (num_tokens >= 2) {
-					obj_uv_t uv = {string_to_real(STRING_ARGS(tokens[0])),
-					               string_to_real(STRING_ARGS(tokens[1]))};
+				if (tokens_count >= 2) {
+					obj_uv_t uv = {string_to_real(STRING_ARGS(tokens[0])), string_to_real(STRING_ARGS(tokens[1]))};
 					array_push(obj->uv, uv);
 				} else {
 					obj_uv_t uv = {0, 0};
@@ -424,7 +420,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("vn"))) {
 				if (!array_capacity(obj->normal))
 					array_reserve(obj->normal, reserve_count);
-				if (num_tokens >= 3) {
+				if (tokens_count >= 3) {
 					obj_normal_t normal = {string_to_real(STRING_ARGS(tokens[0])),
 					                       string_to_real(STRING_ARGS(tokens[1])),
 					                       string_to_real(STRING_ARGS(tokens[2]))};
@@ -433,12 +429,12 @@ obj_read(obj_t* obj, stream_t* stream) {
 					obj_normal_t normal = {0, 0, 0};
 					array_push(obj->normal, normal);
 				}
-			} else if (string_equal(STRING_ARGS(command), STRING_CONST("f")) && (num_tokens > 2)) {
-				size_t num_corners = num_tokens;
+			} else if (string_equal(STRING_ARGS(command), STRING_CONST("f")) && (tokens_count > 2)) {
+				size_t corners_count = tokens_count;
 
 				if (!current_group) {
-					current_group = memory_allocate(HASH_OBJ, sizeof(obj_group_t), 0,
-					                                MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
+					current_group =
+					    memory_allocate(HASH_OBJ, sizeof(obj_group_t), 0, MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
 					array_push(obj->group, current_group);
 
 					current_group->name = group_name;
@@ -458,7 +454,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 					                                   MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
 					array_push(current_group->subgroup, current_subgroup);
 
-					size_t estimated_triangles = (num_vertex_since_group * 3) / 2;
+					size_t estimated_triangles = (vertex_count_since_group * 3) / 2;
 					size_t estimated_corners = estimated_triangles * 3;
 
 					array_reserve(current_subgroup->face, estimated_triangles);
@@ -468,25 +464,25 @@ obj_read(obj_t* obj, stream_t* stream) {
 
 					array_clear(vertex_to_corner);
 
-					num_vertex_since_group = 0;
+					vertex_count_since_group = 0;
 				}
 
 				unsigned int last_index_count = array_size(current_subgroup->index);
 				obj_face_t face = {0, last_index_count};
-				bool valid_face = (num_corners >= 3);
-				for (size_t icorner = 0; valid_face && (icorner < num_corners); ++icorner) {
+				bool valid_face = (corners_count >= 3);
+				for (size_t icorner = 0; valid_face && (icorner < corners_count); ++icorner) {
 					string_const_t corner_token[3];
-					size_t num_corner_tokens = string_explode(
-					    STRING_ARGS(tokens[icorner]), STRING_CONST("/"), corner_token, 3, true);
+					size_t corner_tokens_count =
+					    string_explode(STRING_ARGS(tokens[icorner]), STRING_CONST("/"), corner_token, 3, true);
 
 					int relvert = 0;
 					int reluv = 0;
 					int relnorm = 0;
-					if (num_corner_tokens)
+					if (corner_tokens_count)
 						relvert = string_to_int(STRING_ARGS(corner_token[0]));
-					if (num_corner_tokens > 1)
+					if (corner_tokens_count > 1)
 						reluv = string_to_int(STRING_ARGS(corner_token[1]));
-					if (num_corner_tokens > 2)
+					if (corner_tokens_count > 2)
 						relnorm = string_to_int(STRING_ARGS(corner_token[2]));
 
 					if (relvert < 0)
@@ -509,16 +505,14 @@ obj_read(obj_t* obj, stream_t* stream) {
 						unsigned int ivert = (unsigned int)relvert;
 						unsigned int inorm = (unsigned int)relnorm;
 						unsigned int iuv = (unsigned int)reluv;
-						if ((ivert > array_size(vertex_to_corner)) ||
-						    (vertex_to_corner[ivert - 1] < 0)) {
+						if ((ivert > array_size(vertex_to_corner)) || (vertex_to_corner[ivert - 1] < 0)) {
 							obj_corner_t corner = {ivert, inorm, iuv, -1};
 							corner_index = array_size(current_subgroup->corner);
 							array_push(current_subgroup->corner, corner);
 							if (ivert > array_size(vertex_to_corner)) {
 								unsigned int prev_size = array_size(vertex_to_corner);
 								array_resize(vertex_to_corner, ivert);
-								memset(vertex_to_corner + prev_size, 0xFF,
-								       sizeof(int) * (ivert - prev_size));
+								memset(vertex_to_corner + prev_size, 0xFF, sizeof(int) * (ivert - prev_size));
 							}
 							vertex_to_corner[ivert - 1] = (int)corner_index;
 						} else {
@@ -556,13 +550,12 @@ obj_read(obj_t* obj, stream_t* stream) {
 				} else {
 					array_resize(current_subgroup->index, last_index_count);
 				}
-			} else if (string_equal(STRING_ARGS(command), STRING_CONST("mtllib")) && num_tokens) {
+			} else if (string_equal(STRING_ARGS(command), STRING_CONST("mtllib")) && tokens_count) {
 				load_material_lib(obj, STRING_ARGS(tokens[0]));
-			} else if (string_equal(STRING_ARGS(command), STRING_CONST("usemtl")) && num_tokens) {
+			} else if (string_equal(STRING_ARGS(command), STRING_CONST("usemtl")) && tokens_count) {
 				string_const_t name = tokens[0];
 				unsigned int next_material = INVALID_INDEX;
-				for (unsigned int imat = 0, msize = array_size(obj->material); imat < msize;
-				     ++imat) {
+				for (unsigned int imat = 0, msize = array_size(obj->material); imat < msize; ++imat) {
 					if (string_equal(STRING_ARGS(name), STRING_ARGS(obj->material[imat].name))) {
 						next_material = imat;
 						break;
@@ -574,9 +567,8 @@ obj_read(obj_t* obj, stream_t* stream) {
 				}
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("g"))) {
 				string_deallocate(group_name.str);
-				group_name = (num_tokens && tokens[0].length) ?
-				                 string_clone_string(tokens[0]) :
-				                 string_clone(STRING_CONST("__unnamed"));
+				group_name = (tokens_count && tokens[0].length) ? string_clone_string(tokens[0]) :
+				                                                  string_clone(STRING_CONST("__unnamed"));
 				current_group = nullptr;
 			}
 
@@ -621,8 +613,7 @@ vec_cross(const real* FOUNDATION_RESTRICT first_edge, const real* FOUNDATION_RES
 }
 
 static real
-vec_dot(const real* FOUNDATION_RESTRICT first_normal,
-        const real* FOUNDATION_RESTRICT second_normal) {
+vec_dot(const real* FOUNDATION_RESTRICT first_normal, const real* FOUNDATION_RESTRICT second_normal) {
 	return (first_normal[0] * second_normal[0]) + (first_normal[1] * second_normal[1]) +
 	       (first_normal[2] * second_normal[2]);
 }
@@ -637,8 +628,7 @@ vec_normalize(real* vec) {
 }
 
 static bool
-polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
-               unsigned int corner_count) {
+polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, unsigned int corner_count) {
 	if (corner_count < 4)
 		return true;
 
@@ -661,8 +651,7 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 		cur_corner = next_corner;
 		next_corner = index[(icorner + 2) % corner_count];
 
-		if ((prev_corner == cur_corner) || (prev_corner == next_corner) ||
-		    (cur_corner == next_corner))
+		if ((prev_corner == cur_corner) || (prev_corner == next_corner) || (cur_corner == next_corner))
 			continue;
 
 		last_edge[0] = edge[0];
@@ -677,8 +666,8 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
 		vec_cross(last_edge, edge, normal);
 		if (!first_normal && (vec_dot(last_normal, normal) < 0))
 			return false;
-		if (first_normal && (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) ||
-		                     !math_real_is_zero(normal[2]))) {
+		if (first_normal &&
+		    (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) || !math_real_is_zero(normal[2]))) {
 			last_normal[0] = normal[0];
 			last_normal[1] = normal[1];
 			last_normal[2] = normal[2];
@@ -711,8 +700,8 @@ point_inside_triangle_2d(const real* FOUNDATION_RESTRICT v0, const real* FOUNDAT
 }
 
 static unsigned int
-triangulate_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
-                   unsigned int corner_count, unsigned int** triangle) {
+triangulate_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, unsigned int corner_count,
+                   unsigned int** triangle) {
 	FOUNDATION_UNUSED(vertex);
 	FOUNDATION_UNUSED(corner);
 	unsigned int triangle_count = 0;
@@ -729,8 +718,8 @@ triangulate_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vert
 }
 
 static unsigned int
-triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex,
-                    unsigned int index_count, unsigned int** triangle) {
+triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, unsigned int index_count,
+                    unsigned int** triangle) {
 	if (index_count < 3)
 		return 0;
 
@@ -743,13 +732,10 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 		unsigned int next_index = cur_index + 1;
 		unsigned int next_corner = index[next_index];
 		unsigned int last_corner = index[(cur_index + 2) % index_count];
-		vertex_sub(vertex + (corner[next_corner].vertex - 1),
-		           vertex + (corner[last_corner].vertex - 1), xaxis);
-		vertex_sub(vertex + (corner[next_corner].vertex - 1),
-		           vertex + (corner[cur_corner].vertex - 1), yaxis);
+		vertex_sub(vertex + (corner[next_corner].vertex - 1), vertex + (corner[last_corner].vertex - 1), xaxis);
+		vertex_sub(vertex + (corner[next_corner].vertex - 1), vertex + (corner[cur_corner].vertex - 1), yaxis);
 		vec_cross(xaxis, yaxis, normal);
-		if (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) ||
-		    !math_real_is_zero(normal[2])) {
+		if (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) || !math_real_is_zero(normal[2])) {
 			vec_normalize(normal);
 			break;
 		}
@@ -811,8 +797,7 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 			unsigned int i2 = local[next];
 
 			if ((i0 == i1) || (i0 == i2) || (i1 == i2)) {
-				memmove(local + base, local + base + 1,
-				        sizeof(unsigned int) * (local_count - base - 1));
+				memmove(local + base, local + base + 1, sizeof(unsigned int) * (local_count - base - 1));
 				base = 1;
 				--local_count;
 				continue;
@@ -830,8 +815,7 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 			ysum = coord[(i0 * 2) + 1] + coord[(i2 * 2) + 1];
 			triangle_winding += xdiff * ysum;
 
-			if (((winding < 0) && (triangle_winding >= 0)) ||
-			    ((winding > 0) && (triangle_winding <= 0))) {
+			if (((winding < 0) && (triangle_winding >= 0)) || ((winding > 0) && (triangle_winding <= 0))) {
 				++base;
 				continue;
 			}
@@ -839,9 +823,8 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 			bool point_inside = false;
 			for (unsigned int ipt = 0; !point_inside && (ipt < local_count); ++ipt) {
 				if ((ipt != prev) && (ipt != base) && (ipt != next))
-					point_inside =
-					    point_inside_triangle_2d(coord + (i0 * 2), coord + (i1 * 2),
-					                             coord + (i2 * 2), coord + (local[ipt] * 2));
+					point_inside = point_inside_triangle_2d(coord + (i0 * 2), coord + (i1 * 2), coord + (i2 * 2),
+					                                        coord + (local[ipt] * 2));
 			}
 
 			if (point_inside) {
@@ -854,8 +837,7 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 			array_push(*triangle, index[i2]);
 			++triangle_count;
 
-			memmove(local + base, local + base + 1,
-			        sizeof(unsigned int) * (local_count - base - 1));
+			memmove(local + base, local + base + 1, sizeof(unsigned int) * (local_count - base - 1));
 			base = 1;
 			--local_count;
 
@@ -876,17 +858,14 @@ obj_triangulate_subgroup(obj_t* obj, obj_subgroup_t* subgroup) {
 
 	for (unsigned int iface = 0, fsize = array_size(subgroup->face); iface < fsize; ++iface) {
 		obj_face_t* face = subgroup->face + iface;
-		bool convex = polygon_convex(subgroup->index + face->offset, subgroup->corner, obj->vertex,
-		                             face->count);
+		bool convex = polygon_convex(subgroup->index + face->offset, subgroup->corner, obj->vertex, face->count);
 
 		if (convex)
-			subgroup->triangle_count +=
-			    triangulate_convex(subgroup->index + face->offset, subgroup->corner, obj->vertex,
-			                       face->count, &subgroup->triangle);
+			subgroup->triangle_count += triangulate_convex(subgroup->index + face->offset, subgroup->corner,
+			                                               obj->vertex, face->count, &subgroup->triangle);
 		else
-			subgroup->triangle_count +=
-			    triangulate_concave(subgroup->index + face->offset, subgroup->corner, obj->vertex,
-			                        face->count, &subgroup->triangle);
+			subgroup->triangle_count += triangulate_concave(subgroup->index + face->offset, subgroup->corner,
+			                                                obj->vertex, face->count, &subgroup->triangle);
 	}
 	return true;
 }
@@ -897,8 +876,7 @@ obj_triangulate(obj_t* obj) {
 		return false;
 	for (unsigned int igroup = 0, gsize = array_size(obj->group); igroup < gsize; ++igroup) {
 		obj_group_t* group = obj->group[igroup];
-		for (unsigned int isubgroup = 0, sgsize = array_size(group->subgroup); isubgroup < sgsize;
-		     ++isubgroup) {
+		for (unsigned int isubgroup = 0, sgsize = array_size(group->subgroup); isubgroup < sgsize; ++isubgroup) {
 			obj_subgroup_t* subgroup = group->subgroup[isubgroup];
 			if (subgroup->triangle_count)
 				continue;

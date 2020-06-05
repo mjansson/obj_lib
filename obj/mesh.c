@@ -41,15 +41,13 @@ obj_to_mesh(obj_t* obj) {
 	// Vertex data
 	for (size_t ivertex = 0; ivertex < obj->vertex.count; ++ivertex) {
 		obj_vertex_t* obj_vertex = bucketarray_get(&obj->vertex, ivertex);
-		mesh_coordinate_t coordinate;
-		coordinate.v = vector(obj_vertex->x, obj_vertex->y, obj_vertex->z, 1.0);
+		mesh_coordinate_t coordinate = vector(obj_vertex->x, obj_vertex->y, obj_vertex->z, 1.0);
 		bucketarray_push(&mesh->coordinate, &coordinate);
 	}
 
 	for (size_t inormal = 0; inormal < obj->normal.count; ++inormal) {
 		obj_normal_t* obj_normal = bucketarray_get(&obj->normal, inormal);
-		mesh_normal_t normal;
-		normal.v = vector(obj_normal->nx, obj_normal->ny, obj_normal->nz, 0.0);
+		mesh_normal_t normal = vector(obj_normal->nx, obj_normal->ny, obj_normal->nz, 0.0);
 		bucketarray_push(&mesh->normal, &normal);
 	}
 

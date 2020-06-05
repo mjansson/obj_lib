@@ -17,6 +17,7 @@
 #include <foundation/array.h>
 #include <foundation/stream.h>
 #include <foundation/path.h>
+#include <foundation/bucketarray.h>
 
 static unsigned int INVALID_INDEX = 0xFFFFFFFF;
 
@@ -59,10 +60,10 @@ obj_finalize_groups(obj_t* obj) {
 		obj_group_t* group = obj->group[igroup];
 		for (unsigned int isub = 0, sgsize = array_size(group->subgroup); isub < sgsize; ++isub) {
 			obj_subgroup_t* subgroup = group->subgroup[isub];
-			array_deallocate(subgroup->triangle);
-			array_deallocate(subgroup->index);
-			array_deallocate(subgroup->corner);
-			array_deallocate(subgroup->face);
+			bucketarray_finalize(&subgroup->triangle);
+			bucketarray_finalize(&subgroup->index);
+			bucketarray_finalize(&subgroup->face);
+			bucketarray_finalize(&subgroup->corner);
 			memory_deallocate(subgroup);
 		}
 		array_deallocate(group->subgroup);
@@ -103,9 +104,9 @@ obj_finalize(obj_t* obj) {
 
 	array_deallocate(obj->group);
 	array_deallocate(obj->material);
-	array_deallocate(obj->vertex);
-	array_deallocate(obj->normal);
-	array_deallocate(obj->uv);
+	bucketarray_finalize(&obj->vertex);
+	bucketarray_finalize(&obj->normal);
+	bucketarray_finalize(&obj->uv);
 
 	string_deallocate(obj->base_path.str);
 }
@@ -200,7 +201,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	if (!stream)
 		return false;
 
-	const size_t buffer_capacity = 4000;
+	const size_t buffer_capacity = 65000;
 	char* buffer = memory_allocate(HASH_OBJ, buffer_capacity, 0, MEMORY_PERSISTENT);
 
 	bool material_valid = false;
@@ -321,18 +322,25 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 bool
 obj_read(obj_t* obj, stream_t* stream) {
 	size_t file_size = stream_size(stream);
-	size_t reserve_count = file_size / 128;
-	if (reserve_count < (128 * 1024))
-		reserve_count = 128 * 1024;
+	size_t estimated_vertex_count = file_size / 200;
+	size_t reserve_vertex_count = estimated_vertex_count / 8;
+	if (estimated_vertex_count < 1024) {
+		estimated_vertex_count = 1024;
+		reserve_vertex_count = estimated_vertex_count;
+	}
 
 	obj_finalize_groups(obj);
 	obj_finalize_materials(obj);
 
-	array_clear(obj->vertex);
-	array_clear(obj->normal);
-	array_clear(obj->uv);
+	bucketarray_finalize(&obj->vertex);
+	bucketarray_finalize(&obj->normal);
+	bucketarray_finalize(&obj->uv);
 
-	array_reserve(obj->vertex, reserve_count);
+	bucketarray_initialize(&obj->vertex, sizeof(obj_vertex_t), reserve_vertex_count);
+	bucketarray_reserve(&obj->vertex, reserve_vertex_count);
+
+	bucketarray_initialize(&obj->normal, sizeof(obj_normal_t), reserve_vertex_count);
+	bucketarray_initialize(&obj->uv, sizeof(obj_uv_t), reserve_vertex_count);
 
 	string_deallocate(obj->base_path.str);
 	string_const_t path = stream_path(stream);
@@ -352,8 +360,9 @@ obj_read(obj_t* obj, stream_t* stream) {
 	string_t group_name = {0};
 	unsigned int material_index = INVALID_INDEX;
 
-	int* vertex_to_corner = nullptr;
-	array_reserve(vertex_to_corner, array_capacity(obj->vertex));
+	bucketarray_t vertex_to_corner;
+	bucketarray_initialize(&vertex_to_corner, sizeof(int), reserve_vertex_count);
+	bucketarray_reserve(&vertex_to_corner, reserve_vertex_count);
 
 	while (!stream_eos(stream)) {
 		size_t last_remain = 0;
@@ -401,33 +410,33 @@ obj_read(obj_t* obj, stream_t* stream) {
 					obj_vertex_t vertex = {string_to_real(STRING_ARGS(tokens[0])),
 					                       string_to_real(STRING_ARGS(tokens[1])),
 					                       (tokens_count > 2) ? string_to_real(STRING_ARGS(tokens[2])) : 0.0f};
-					array_push(obj->vertex, vertex);
+					bucketarray_push(&obj->vertex, &vertex);
 				} else {
 					obj_vertex_t vertex = {0, 0, 0};
-					array_push(obj->vertex, vertex);
+					bucketarray_push(&obj->vertex, &vertex);
 				}
 				++vertex_count_since_group;
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("vt"))) {
-				if (!array_capacity(obj->uv))
-					array_reserve(obj->uv, reserve_count);
+				if (!obj->uv.bucket_count)
+					bucketarray_reserve(&obj->uv, reserve_vertex_count);
 				if (tokens_count >= 2) {
 					obj_uv_t uv = {string_to_real(STRING_ARGS(tokens[0])), string_to_real(STRING_ARGS(tokens[1]))};
-					array_push(obj->uv, uv);
+					bucketarray_push(&obj->uv, &uv);
 				} else {
 					obj_uv_t uv = {0, 0};
-					array_push(obj->uv, uv);
+					bucketarray_push(&obj->uv, &uv);
 				}
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("vn"))) {
-				if (!array_capacity(obj->normal))
-					array_reserve(obj->normal, reserve_count);
+				if (!obj->normal.bucket_count)
+					bucketarray_reserve(&obj->normal, reserve_vertex_count);
 				if (tokens_count >= 3) {
 					obj_normal_t normal = {string_to_real(STRING_ARGS(tokens[0])),
 					                       string_to_real(STRING_ARGS(tokens[1])),
 					                       string_to_real(STRING_ARGS(tokens[2]))};
-					array_push(obj->normal, normal);
+					bucketarray_push(&obj->normal, &normal);
 				} else {
 					obj_normal_t normal = {0, 0, 0};
-					array_push(obj->normal, normal);
+					bucketarray_push(&obj->normal, &normal);
 				}
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("f")) && (tokens_count > 2)) {
 				size_t corners_count = tokens_count;
@@ -454,21 +463,37 @@ obj_read(obj_t* obj, stream_t* stream) {
 					                                   MEMORY_PERSISTENT | MEMORY_ZERO_INITIALIZED);
 					array_push(current_group->subgroup, current_subgroup);
 
-					size_t estimated_triangles = (vertex_count_since_group * 3) / 2;
+					size_t estimated_triangles = (vertex_count_since_group * 3) / 4;
 					size_t estimated_corners = estimated_triangles * 3;
 
-					array_reserve(current_subgroup->face, estimated_triangles);
-					array_reserve(current_subgroup->corner, estimated_corners);
-					array_reserve(current_subgroup->index, estimated_corners);
+					size_t min_bucket_size = 1024;
+					if ((estimated_triangles / 4) > min_bucket_size)
+						min_bucket_size = (estimated_triangles / 4);
+
+					bucketarray_initialize(&current_subgroup->face, sizeof(obj_face_t), min_bucket_size);
+					bucketarray_reserve(&current_subgroup->face, estimated_triangles / 2);
+
+					bucketarray_initialize(&current_subgroup->triangle, sizeof(obj_triangle_t), min_bucket_size);
+
+					min_bucket_size = 1024;
+					if ((estimated_corners / 4) > min_bucket_size)
+						min_bucket_size = (estimated_corners / 4);
+
+					bucketarray_initialize(&current_subgroup->index, sizeof(unsigned int), min_bucket_size);
+					bucketarray_reserve(&current_subgroup->index, estimated_corners / 2);
+
+					bucketarray_initialize(&current_subgroup->corner, sizeof(obj_corner_t), min_bucket_size);
+					bucketarray_reserve(&current_subgroup->corner, estimated_corners / 2);
+
 					current_subgroup->material = material_index;
 
-					array_clear(vertex_to_corner);
+					bucketarray_clear(&vertex_to_corner);
 
 					vertex_count_since_group = 0;
 				}
 
-				unsigned int last_index_count = array_size(current_subgroup->index);
-				obj_face_t face = {0, last_index_count};
+				size_t last_index_count = current_subgroup->index.count;
+				obj_face_t face = {0, (unsigned int)last_index_count};
 				bool valid_face = (corners_count >= 3);
 				for (size_t icorner = 0; valid_face && (icorner < corners_count); ++icorner) {
 					string_const_t corner_token[3];
@@ -486,40 +511,37 @@ obj_read(obj_t* obj, stream_t* stream) {
 						relnorm = string_to_int(STRING_ARGS(corner_token[2]));
 
 					if (relvert < 0)
-						relvert += (int)array_size(obj->vertex) + 1;
+						relvert += (int)obj->vertex.count + 1;
 					if (relnorm < 0)
-						relnorm = (int)array_size(obj->normal) + 1;
+						relnorm = (int)obj->normal.count + 1;
 					if (reluv < 0)
-						reluv = (int)array_size(obj->uv) + 1;
+						reluv = (int)obj->uv.count + 1;
 
-					if ((relvert <= 0) || (relvert > (int)array_size(obj->vertex)))
+					if ((relvert <= 0) || (relvert > (int)obj->vertex.count))
 						valid_face = false;
-					if ((relnorm <= 0) || (relnorm > (int)array_size(obj->normal)))
+					if ((relnorm <= 0) || (relnorm > (int)obj->normal.count))
 						relnorm = 0;
-					if ((reluv <= 0) || (reluv > (int)array_size(obj->uv)))
+					if ((reluv <= 0) || (reluv > (int)obj->uv.count))
 						reluv = 0;
 
 					if (valid_face) {
-						unsigned int corner_index;
-						unsigned int corner_count = array_size(current_subgroup->corner);
+						size_t corner_index;
 						unsigned int ivert = (unsigned int)relvert;
 						unsigned int inorm = (unsigned int)relnorm;
 						unsigned int iuv = (unsigned int)reluv;
-						if ((ivert > array_size(vertex_to_corner)) || (vertex_to_corner[ivert - 1] < 0)) {
+						if ((ivert > vertex_to_corner.count) ||
+						    (*bucketarray_get_as(int, &vertex_to_corner, ivert - 1) < 0)) {
 							obj_corner_t corner = {ivert, inorm, iuv, -1};
-							corner_index = array_size(current_subgroup->corner);
-							array_push(current_subgroup->corner, corner);
-							if (ivert > array_size(vertex_to_corner)) {
-								unsigned int prev_size = array_size(vertex_to_corner);
-								array_resize(vertex_to_corner, ivert);
-								memset(vertex_to_corner + prev_size, 0xFF, sizeof(int) * (ivert - prev_size));
-							}
-							vertex_to_corner[ivert - 1] = (int)corner_index;
+							corner_index = current_subgroup->corner.count;
+							bucketarray_push(&current_subgroup->corner, &corner);
+							if (ivert > vertex_to_corner.count)
+								bucketarray_resize_fill(&vertex_to_corner, ivert, 0xff);
+							*bucketarray_get_as(int, &vertex_to_corner, ivert - 1) = (int)corner_index;
 						} else {
-							corner_index = (unsigned int)vertex_to_corner[ivert - 1];
-							unsigned int last_corner = (unsigned int)-1;
-							while (corner_index < corner_count) {
-								obj_corner_t* corner = current_subgroup->corner + corner_index;
+							corner_index = (size_t)*bucketarray_get_as(int, &vertex_to_corner, ivert - 1);
+							size_t last_corner_index = (size_t)-1;
+							while (corner_index < current_subgroup->corner.count) {
+								obj_corner_t* corner = bucketarray_get(&current_subgroup->corner, corner_index);
 								if (!corner->normal || !inorm || (corner->normal == inorm)) {
 									if (!corner->uv || !iuv || (corner->uv == iuv)) {
 										if (inorm && !corner->normal)
@@ -529,26 +551,29 @@ obj_read(obj_t* obj, stream_t* stream) {
 										break;
 									}
 								}
-								corner_index = (unsigned int)corner->next;
-								last_corner = corner_index;
+								corner_index = (size_t)corner->next;
+								last_corner_index = corner_index;
 							}
-							if (corner_index >= corner_count) {
+							if (corner_index >= current_subgroup->corner.count) {
 								obj_corner_t corner = {ivert, inorm, iuv, -1};
-								corner_index = array_size(current_subgroup->corner);
-								array_push(current_subgroup->corner, corner);
-								if (last_corner < corner_count)
-									current_subgroup->corner[last_corner].next = (int)corner_index;
+								corner_index = current_subgroup->corner.count;
+								bucketarray_push(&current_subgroup->corner, &corner);
+								if (last_corner_index < corner_index) {
+									obj_corner_t* last_corner =
+									    bucketarray_get(&current_subgroup->corner, last_corner_index);
+									last_corner->next = (int)corner_index;
+								}
 							}
 						}
-						array_push(current_subgroup->index, corner_index);
+						bucketarray_push(&current_subgroup->index, &corner_index);
 						++face.count;
 					}
 				}
 
 				if (valid_face) {
-					array_push(current_subgroup->face, face);
+					bucketarray_push(&current_subgroup->face, &face);
 				} else {
-					array_resize(current_subgroup->index, last_index_count);
+					bucketarray_resize(&current_subgroup->index, last_index_count);
 				}
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("mtllib")) && tokens_count) {
 				load_material_lib(obj, STRING_ARGS(tokens[0]));
@@ -583,8 +608,9 @@ obj_read(obj_t* obj, stream_t* stream) {
 			stream_seek(stream, -(ssize_t)last_remain, STREAM_SEEK_CURRENT);
 	}
 
+	bucketarray_finalize(&vertex_to_corner);
+
 	string_deallocate(group_name.str);
-	array_deallocate(vertex_to_corner);
 	memory_deallocate(buffer);
 
 	return true;
@@ -628,16 +654,19 @@ vec_normalize(real* vec) {
 }
 
 static bool
-polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, unsigned int corner_count) {
+polygon_convex(bucketarray_t* index, unsigned int base_offset, bucketarray_t* corner, bucketarray_t* vertex,
+               unsigned int corner_count) {
 	if (corner_count < 4)
 		return true;
 
 	unsigned int prev_corner;
-	unsigned int cur_corner = index[0];
-	unsigned int next_corner = index[1];
+	unsigned int cur_corner = *bucketarray_get_as(unsigned int, index, base_offset);
+	unsigned int next_corner = *bucketarray_get_as(unsigned int, index, base_offset + 1);
 
-	obj_vertex_t* next_vertex = vertex + (corner[next_corner].vertex - 1);
-	obj_vertex_t* cur_vertex = vertex + (corner[cur_corner].vertex - 1);
+	obj_vertex_t* next_vertex =
+	    bucketarray_get(vertex, bucketarray_get_as(obj_corner_t, corner, next_corner)->vertex - 1);
+	obj_vertex_t* cur_vertex =
+	    bucketarray_get(vertex, bucketarray_get_as(obj_corner_t, corner, cur_corner)->vertex - 1);
 
 	real edge[3];
 	vertex_sub(cur_vertex, next_vertex, edge);
@@ -649,7 +678,7 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, 
 	for (unsigned int icorner = 0; icorner < corner_count; ++icorner) {
 		prev_corner = cur_corner;
 		cur_corner = next_corner;
-		next_corner = index[(icorner + 2) % corner_count];
+		next_corner = *bucketarray_get_as(unsigned int, index, base_offset + ((icorner + 2) % corner_count));
 
 		if ((prev_corner == cur_corner) || (prev_corner == next_corner) || (cur_corner == next_corner))
 			continue;
@@ -659,7 +688,7 @@ polygon_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, 
 		last_edge[2] = edge[2];
 
 		cur_vertex = next_vertex;
-		next_vertex = vertex + (corner[next_corner].vertex - 1);
+		next_vertex = bucketarray_get(vertex, bucketarray_get_as(obj_corner_t, corner, next_corner)->vertex - 1);
 		vertex_sub(cur_vertex, next_vertex, edge);
 
 		real normal[3];
@@ -700,26 +729,29 @@ point_inside_triangle_2d(const real* FOUNDATION_RESTRICT v0, const real* FOUNDAT
 }
 
 static unsigned int
-triangulate_convex(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, unsigned int corner_count,
-                   unsigned int** triangle) {
+triangulate_convex(bucketarray_t* index, unsigned int base_offset, bucketarray_t* corner, bucketarray_t* vertex,
+                   unsigned int corner_count, bucketarray_t* triangle) {
 	FOUNDATION_UNUSED(vertex);
 	FOUNDATION_UNUSED(corner);
 	unsigned int triangle_count = 0;
 	unsigned int base = 1;
+	unsigned int first_index = *bucketarray_get_as(unsigned int, index, base_offset);
+	unsigned int next_index = *bucketarray_get_as(unsigned int, index, base_offset + base);
 	while (corner_count >= 3) {
-		array_push(*triangle, index[0]);
-		array_push(*triangle, index[base]);
-		array_push(*triangle, index[base + 1]);
+		unsigned int last_index = *bucketarray_get_as(unsigned int, index, base_offset + base + 1);
+		obj_triangle_t new_triangle = {first_index, next_index, last_index};
+		bucketarray_push(triangle, &new_triangle);
 		++base;
 		++triangle_count;
 		--corner_count;
+		next_index = last_index;
 	}
 	return triangle_count;
 }
 
 static unsigned int
-triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* vertex, unsigned int index_count,
-                    unsigned int** triangle) {
+triangulate_concave(bucketarray_t* index, unsigned int base_offset, bucketarray_t* corner, bucketarray_t* vertex,
+                    unsigned int index_count, bucketarray_t* triangle) {
 	if (index_count < 3)
 		return 0;
 
@@ -727,13 +759,19 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 	real yaxis[3];
 	real normal[3];
 	unsigned int cur_index = 0;
-	unsigned int cur_corner = index[cur_index];
+	unsigned int cur_corner_index = *bucketarray_get_as(unsigned int, index, base_offset + cur_index);
+	obj_corner_t* cur_corner = bucketarray_get(corner, cur_corner_index);
 	do {
 		unsigned int next_index = cur_index + 1;
-		unsigned int next_corner = index[next_index];
-		unsigned int last_corner = index[(cur_index + 2) % index_count];
-		vertex_sub(vertex + (corner[next_corner].vertex - 1), vertex + (corner[last_corner].vertex - 1), xaxis);
-		vertex_sub(vertex + (corner[next_corner].vertex - 1), vertex + (corner[cur_corner].vertex - 1), yaxis);
+		unsigned int next_corner_index = *bucketarray_get_as(unsigned int, index, base_offset + next_index);
+		unsigned int last_corner_index =
+		    *bucketarray_get_as(unsigned int, index, base_offset + ((cur_index + 2) % index_count));
+		obj_corner_t* next_corner = bucketarray_get(corner, next_corner_index);
+		obj_corner_t* last_corner = bucketarray_get(corner, last_corner_index);
+		vertex_sub(bucketarray_get(vertex, next_corner->vertex - 1), bucketarray_get(vertex, last_corner->vertex - 1),
+		           xaxis);
+		vertex_sub(bucketarray_get(vertex, next_corner->vertex - 1), bucketarray_get(vertex, cur_corner->vertex - 1),
+		           yaxis);
 		vec_cross(xaxis, yaxis, normal);
 		if (!math_real_is_zero(normal[0]) || !math_real_is_zero(normal[1]) || !math_real_is_zero(normal[2])) {
 			vec_normalize(normal);
@@ -762,7 +800,8 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 		local = memory_allocate(HASH_OBJ, sizeof(unsigned int) * index_count, 0, MEMORY_TEMPORARY);
 	}
 
-	obj_vertex_t* origo = vertex + (corner[index[0]].vertex - 1);
+	cur_corner = bucketarray_get(corner, *bucketarray_get_as(unsigned int, index, base_offset));
+	obj_vertex_t* origo = bucketarray_get(vertex, cur_corner->vertex - 1);
 
 	// Project polygon on plane
 	coord[0] = 0;
@@ -770,7 +809,8 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 	local[0] = 0;
 	for (unsigned int icorner = 1; icorner < index_count; ++icorner) {
 		real diff[3];
-		vertex_sub(origo, vertex + (corner[index[icorner]].vertex - 1), diff);
+		cur_corner = bucketarray_get(corner, *bucketarray_get_as(unsigned int, index, base_offset + icorner));
+		vertex_sub(origo, bucketarray_get(vertex, cur_corner->vertex - 1), diff);
 		coord[(icorner * 2) + 0] = vec_dot(diff, xaxis);
 		coord[(icorner * 2) + 1] = vec_dot(diff, yaxis);
 		local[icorner] = icorner;
@@ -832,9 +872,10 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 				continue;
 			}
 
-			array_push(*triangle, index[i0]);
-			array_push(*triangle, index[i1]);
-			array_push(*triangle, index[i2]);
+			obj_triangle_t new_triangle = {*bucketarray_get_as(unsigned int, index, base_offset + i0),
+			                               *bucketarray_get_as(unsigned int, index, base_offset + i1),
+			                               *bucketarray_get_as(unsigned int, index, base_offset + i2)};
+			bucketarray_push(triangle, &new_triangle);
 			++triangle_count;
 
 			memmove(local + base, local + base + 1, sizeof(unsigned int) * (local_count - base - 1));
@@ -852,20 +893,19 @@ triangulate_concave(unsigned int* index, obj_corner_t* corner, obj_vertex_t* ver
 
 static bool
 obj_triangulate_subgroup(obj_t* obj, obj_subgroup_t* subgroup) {
-	array_clear(subgroup->triangle);
-	array_reserve(subgroup->triangle, 3 * array_size(subgroup->face));
-	subgroup->triangle_count = 0;
+	bucketarray_reserve(&subgroup->triangle, 3 * subgroup->face.count);
+	bucketarray_resize(&subgroup->triangle, 0);
 
-	for (unsigned int iface = 0, fsize = array_size(subgroup->face); iface < fsize; ++iface) {
-		obj_face_t* face = subgroup->face + iface;
-		bool convex = polygon_convex(subgroup->index + face->offset, subgroup->corner, obj->vertex, face->count);
+	for (size_t iface = 0, fsize = subgroup->face.count; iface < fsize; ++iface) {
+		obj_face_t* face = bucketarray_get(&subgroup->face, iface);
+		bool convex = polygon_convex(&subgroup->index, face->offset, &subgroup->corner, &obj->vertex, face->count);
 
 		if (convex)
-			subgroup->triangle_count += triangulate_convex(subgroup->index + face->offset, subgroup->corner,
-			                                               obj->vertex, face->count, &subgroup->triangle);
+			triangulate_convex(&subgroup->index, face->offset, &subgroup->corner, &obj->vertex, face->count,
+			                   &subgroup->triangle);
 		else
-			subgroup->triangle_count += triangulate_concave(subgroup->index + face->offset, subgroup->corner,
-			                                                obj->vertex, face->count, &subgroup->triangle);
+			triangulate_concave(&subgroup->index, face->offset, &subgroup->corner, &obj->vertex, face->count,
+			                    &subgroup->triangle);
 	}
 	return true;
 }
@@ -878,7 +918,7 @@ obj_triangulate(obj_t* obj) {
 		obj_group_t* group = obj->group[igroup];
 		for (unsigned int isubgroup = 0, sgsize = array_size(group->subgroup); isubgroup < sgsize; ++isubgroup) {
 			obj_subgroup_t* subgroup = group->subgroup[isubgroup];
-			if (subgroup->triangle_count)
+			if (subgroup->triangle.count)
 				continue;
 			if (!obj_triangulate_subgroup(obj, subgroup))
 				return false;

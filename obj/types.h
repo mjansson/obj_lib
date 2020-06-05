@@ -51,11 +51,9 @@ typedef struct obj_normal_t obj_normal_t;
 typedef struct obj_uv_t obj_uv_t;
 typedef struct obj_corner_t obj_corner_t;
 typedef struct obj_face_t obj_face_t;
+typedef struct obj_triangle_t obj_triangle_t;
 typedef struct obj_subgroup_t obj_subgroup_t;
 typedef struct obj_group_t obj_group_t;
-
-//! Extern data structures
-typedef struct mesh_t mesh_t;
 
 struct obj_config_t {
 	obj_stream_open stream_open;
@@ -123,6 +121,11 @@ struct obj_corner_t {
 	int next;
 };
 
+struct obj_triangle_t {
+	//! Index into corner array
+	unsigned int index[3];
+};
+
 struct obj_face_t {
 	//! Number of indices in face
 	unsigned int count;
@@ -134,15 +137,13 @@ struct obj_subgroup_t {
 	//! Material index
 	unsigned int material;
 	//! Corner data (unique corner tuples, can be shared between faces)
-	obj_corner_t* corner;
+	bucketarray_t corner;
 	//! Corner indices for all faces
-	unsigned int* index;
+	bucketarray_t index;
 	//! Subgroup faces
-	obj_face_t* face;
+	bucketarray_t face;
 	//! Triangulation by obj_triangulate (zero-based index into corner array)
-	unsigned int* triangle;
-	//! Number of triangles in triangulation
-	unsigned int triangle_count;
+	bucketarray_t triangle;
 };
 
 struct obj_group_t {
@@ -153,8 +154,8 @@ struct obj_group_t {
 struct obj_t {
 	string_t base_path;
 	obj_material_t* material;
-	obj_vertex_t* vertex;
-	obj_normal_t* normal;
-	obj_uv_t* uv;
+	bucketarray_t vertex;
+	bucketarray_t normal;
+	bucketarray_t uv;
 	obj_group_t** group;
 };

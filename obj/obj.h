@@ -20,6 +20,8 @@
 #include <obj/types.h>
 #include <obj/hashstrings.h>
 
+#include <obj/mesh.h>
+
 /*! Initialize OBJ library
     \return 0 if success, <0 if error */
 OBJ_API int
@@ -77,15 +79,3 @@ obj_write(const obj_t* obj, stream_t* stream);
 \return true if successful, false if error */
 OBJ_API bool
 obj_triangulate(obj_t* obj);
-
-/*! Transcode OBJ data to mesh
-\param obj Source OBJ data structure
-\param mesh Destination mesh data structure */
-OBJ_API void
-obj_to_mesh(obj_t* obj, mesh_t* mesh);
-
-/*! Transcode mesh data to obj
-\param mesh Source mesh data structure
-\param obj Destination OBJ data structure */
-OBJ_API void
-obj_from_mesh(mesh_t* mesh, obj_t* obj);

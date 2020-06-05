@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.join('build', 'ninja'))
 
 import generator
 
-dependlibs = ['mesh', 'foundation']
+dependlibs = ['mesh', 'vector', 'foundation']
 
 generator = generator.Generator(project = 'obj', dependlibs = dependlibs, variables = [('bundleidentifier', 'com.maniccoder.obj.$(binname)')])
 target = generator.target
@@ -19,7 +19,7 @@ extrasources = []
 includepaths = []
 
 obj_sources = [
-  'obj.c', 'version.c' ]
+  'obj.c', 'mesh.c', 'version.c' ]
 
 obj_lib = generator.lib(module = 'obj', sources = obj_sources + extrasources)
 #obj_so = generator.sharedlib(module = 'obj', sources = obj_sources + extrasources)

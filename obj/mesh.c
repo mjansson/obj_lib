@@ -12,8 +12,6 @@
  *
  */
 
-#pragma once
-
 #include <obj/mesh.h>
 
 #include <mesh/mesh.h>

@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>obj</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ProjectGuid>{98B6F065-EA75-4A2A-8D9F-CE9C8278A6F6}</ProjectGuid>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <Import Project="$(SolutionDir)\build.default.props" />
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup>
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <ItemGroup>
+    <ClInclude Include="..\..\obj\build.h" />
+    <ClInclude Include="..\..\obj\hashstrings.h" />
+    <ClInclude Include="..\..\obj\mesh.h" />
+    <ClInclude Include="..\..\obj\obj.h" />
+    <ClInclude Include="..\..\obj\types.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\..\obj\hashstrings.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\obj\mesh.c" />
+    <ClCompile Include="..\..\obj\obj.c" />
+    <ClCompile Include="..\..\obj\version.c" />
+  </ItemGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\..\foundation;$(ProjectDir)..\..\..\foundation_lib;$(ProjectDir)..\..\..\vector;$(ProjectDir)..\..\..\vector_lib;$(ProjectDir)..\..\..\mesh;$(ProjectDir)..\..\..\mesh_lib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>OBJ_COMPILE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

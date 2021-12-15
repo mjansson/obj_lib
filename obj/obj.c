@@ -21,11 +21,11 @@
 
 static unsigned int INVALID_INDEX = 0xFFFFFFFF;
 
-static obj_config_t _obj_config;
+static obj_config_t obj_config;
 
 int
 obj_module_initialize(obj_config_t config) {
-	_obj_config = config;
+	obj_config = config;
 	return 0;
 }
 
@@ -183,8 +183,8 @@ material_default(void) {
 static bool
 load_material_lib(obj_t* obj, const char* filename, size_t length) {
 	stream_t* stream = nullptr;
-	if (_obj_config.stream_open) {
-		stream = _obj_config.stream_open(filename, length, STREAM_IN);
+	if (obj_config.stream_open) {
+		stream = obj_config.stream_open(filename, length, STREAM_IN);
 	} else {
 		stream = stream_open(filename, length, STREAM_IN);
 		if (!stream) {
@@ -192,8 +192,8 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 			stream = stream_open(STRING_ARGS(testpath), STREAM_IN);
 			string_deallocate(testpath.str);
 		}
-		for (size_t ipath = 0; !stream && ipath < _obj_config.search_path_count; ++ipath) {
-			string_t testpath = path_allocate_concat(STRING_ARGS(_obj_config.search_path[ipath]), filename, length);
+		for (size_t ipath = 0; !stream && ipath < obj_config.search_path_count; ++ipath) {
+			string_t testpath = path_allocate_concat(STRING_ARGS(obj_config.search_path[ipath]), filename, length);
 			stream = stream_open(STRING_ARGS(testpath), STREAM_IN);
 			string_deallocate(testpath.str);
 		}
@@ -258,7 +258,7 @@ load_material_lib(obj_t* obj, const char* filename, size_t length) {
 					obj_finalize_material(&material);
 				material = material_default();
 				material.name = (tokens_count && tokens[0].length) ? string_clone(STRING_ARGS(tokens[0])) :
-				                                                     string_clone(STRING_CONST("__unnamed"));
+                                                                     string_clone(STRING_CONST("__unnamed"));
 				material_valid = true;
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("d")) && tokens_count) {
 				material.dissolve_factor = string_to_real(STRING_ARGS(tokens[0]));
@@ -593,7 +593,7 @@ obj_read(obj_t* obj, stream_t* stream) {
 			} else if (string_equal(STRING_ARGS(command), STRING_CONST("g"))) {
 				string_deallocate(group_name.str);
 				group_name = (tokens_count && tokens[0].length) ? string_clone_string(tokens[0]) :
-				                                                  string_clone(STRING_CONST("__unnamed"));
+                                                                  string_clone(STRING_CONST("__unnamed"));
 				current_group = nullptr;
 			}
 
